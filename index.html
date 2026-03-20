@@ -700,8 +700,9 @@ async function createPoll(){
   const btn=document.getElementById('create-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Creating...';
   try{
-    const polls=await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,description:desc,deadline,ical_urls}});
-    const poll=polls[0];
+    await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,description:desc,deadline,ical_urls},prefer:'return=minimal'});
+    const pollsResult=await api(`polls?instructor_name=eq.${encodeURIComponent(instructor)}&event_name=eq.${encodeURIComponent(name)}&order=created_at.desc&limit=1&select=*`);
+    const poll=pollsResult[0];
     const excludeAll=document.getElementById('exclude-all-conflicts').checked;
     const allSlots=slots.flatMap(slot=>expandSlot(slot).map(ex=>({poll_id:poll.id,date:ex.date,start_time:ex.start+':00',end_time:ex.end+':00',recurrence_group:ex.isRecur?ex.recurGroup:null,recurrence_weeks:ex.isRecur?ex.weeks:null,_key:slotKey(ex.date,ex.start,ex.end),_hasConflict:isConflict(ex.date,ex.start,ex.end)})));
     const filteredSlots=allSlots.filter(s=>{
