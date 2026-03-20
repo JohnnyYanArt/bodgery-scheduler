@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bodgery Class Scheduler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Staatliches&family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --gold: #E8B15B; --orange: #E87E5B; --gray: #CCCCCC; --dark: #303030;
+      --bg: #f7f5f2; --surface: #ffffff; --border: #e0ddd8; --text: #303030; --muted: #777;
+    }
+    body { font-family: 'Noto Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    .app-header { background: var(--dark); padding: 0 1.5rem; display: flex; align-items: center; gap: 12px; height: 54px; }
+    .header-logo { height: 36px; width: auto; }
+    .logo-divider { width: 1px; height: 28px; background: #555; }
+    .logo-scheduler { font-family: 'Noto Sans', sans-serif; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--gray); }
+    .logo-fallback { font-family: 'Staatliches', sans-serif; font-size: 26px; letter-spacing: 2px; color: var(--gold); }
+
+    .nav-tabs { display: flex; border-bottom: 2px solid var(--border); background: var(--surface); padding: 0 1.5rem; }
+    .nav-tab { padding: 11px 18px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; border: none; background: none; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+    .nav-tab.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+    .page { display: none; padding: 1.5rem; max-width: 860px; margin: 0 auto; }
+    .page.active { display: block; }
+
+    .section-title { font-family: 'Staatliches', sans-serif; font-size: 26px; letter-spacing: 0.5px; margin-bottom: 2px; }
+    .section-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.25rem; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+    .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 0.9rem; }
+
+    label { display: block; font-size: 12px; font-weight: 700; color: var(--dark); margin-bottom: 3px; margin-top: 10px; }
+    label:first-child { margin-top: 0; }
+    input[type=text], input[type=date], input[type=url], input[type=time], input[type=number], textarea {
+      width: 100%; padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px;
+      font-family: 'Noto Sans', sans-serif; font-size: 13px; color: var(--text); background: var(--bg);
+    }
+    input:focus, textarea:focus { outline: 2px solid var(--gold); border-color: transparent; }
+    textarea { resize: vertical; min-height: 64px; }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-family: 'Noto Sans', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; border: none; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--orange); color: #fff; }
+    .btn-secondary { background: var(--dark); color: #fff; }
+    .btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--dark); }
+    .btn-gold { background: var(--gold); color: var(--dark); }
+    .btn-danger { background: #c0392b; color: #fff; }
+    .btn-warn { background: #e67e22; color: #fff; }
+    .btn-sm { padding: 5px 11px; font-size: 10px; }
+
+    .slot-builder { background: #faf9f7; border: 1px dashed var(--border); border-radius: 8px; padding: 1rem; margin-top: 8px; }
+    .builder-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+    .builder-row > div { flex: 1; min-width: 120px; }
+
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .toggle-switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-track { position: absolute; inset: 0; background: var(--border); border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+    .toggle-switch input:checked + .toggle-track { background: var(--dark); }
+    .toggle-track:before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform 0.2s; }
+    .toggle-switch input:checked + .toggle-track:before { transform: translateX(16px); }
+    .toggle-label { font-size: 12px; font-weight: 700; color: var(--dark); }
+
+    .recur-opts { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+    .recur-opts > div { flex: 1; min-width: 120px; }
+
+    .day-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+    .day-chip { padding: 4px 10px; border-radius: 20px; border: 1.5px solid var(--border); font-size: 11px; font-weight: 700; cursor: pointer; background: var(--surface); color: var(--muted); transition: all 0.12s; user-select: none; }
+    .day-chip.on { background: var(--dark); border-color: var(--dark); color: #fff; }
+
+    .slot-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    .slot-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+    .slot-label { font-size: 13px; font-weight: 700; }
+    .slot-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .recur-badge { display: inline-block; padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; background: var(--dark); color: var(--gold); margin-left: 6px; vertical-align: middle; }
+
+    .ical-rows { display: flex; flex-direction: column; gap: 6px; }
+    .ical-row { display: flex; gap: 8px; }
+    .ical-row input { flex: 1; }
+
+    .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .cal-title { font-family: 'Staatliches', sans-serif; font-size: 20px; letter-spacing: 0.5px; }
+    .view-toggle { display: flex; border: 1.5px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .view-btn { padding: 4px 13px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; border: none; background: var(--surface); color: var(--muted); cursor: pointer; }
+    .view-btn.on { background: var(--dark); color: #fff; }
+
+    .cal-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .cal-grid th { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); padding: 5px 0; text-align: center; letter-spacing: 0.4px; }
+    .cal-grid td { border: 1px solid var(--border); vertical-align: top; }
+    .cal-day { padding: 3px 5px; min-height: 74px; }
+    .cal-day.other { background: #f0ede8; }
+    .cal-day.today { background: #fffbf2; }
+    .day-num { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 2px; }
+    .today .day-num { color: var(--orange); }
+    .pill { display: block; font-size: 9px; font-weight: 700; padding: 2px 4px; border-radius: 3px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pill.avail { background: #e8f5ee; color: #2d6a4f; border: 1px solid #74c69d; }
+    .pill.avail-recur { background: #fdf3e0; color: #7a4f00; border: 1px solid var(--gold); }
+    .pill.conflict { background: #fde8e4; color: #9d3b22; border: 1px solid var(--orange); }
+
+    .week-tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .week-tbl th { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); padding: 6px 4px; text-align: center; border: 1px solid var(--border); }
+    .time-lbl { font-size: 10px; color: var(--muted); padding: 0 6px; text-align: right; border-right: 1px solid var(--border); white-space: nowrap; width: 52px; vertical-align: top; padding-top: 4px; }
+    .week-cell { border: 1px solid var(--border); height: 36px; position: relative; vertical-align: top; }
+    .week-block { position: absolute; left: 2px; right: 2px; top: 2px; border-radius: 3px; font-size: 9px; font-weight: 700; padding: 1px 3px; overflow: hidden; }
+    .week-block.avail { background: #e8f5ee; color: #2d6a4f; border: 1px solid #74c69d; }
+    .week-block.avail-recur { background: #fdf3e0; color: #7a4f00; border: 1px solid var(--gold); }
+    .week-block.conflict { background: #fde8e4; color: #9d3b22; border: 1px solid var(--orange); }
+
+    .legend { display: flex; gap: 14px; font-size: 11px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+    .ldot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 3px; vertical-align: middle; }
+
+    .success-box { background: #e8f5ee; border: 1px solid #74c69d; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; color: #2d6a4f; font-size: 13px; }
+    .link-box { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px; font-size: 12px; font-family: monospace; word-break: break-all; margin: 6px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .link-box span { flex: 1; }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: 13px; }
+    .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .vote-grid { display: flex; flex-direction: column; gap: 10px; }
+    .vote-btn { padding: 10px 16px; border-radius: 6px; border: 1.5px solid var(--border); background: var(--surface); font-family: 'Noto Sans', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--dark); transition: all 0.12s; text-align: left; width: 100%; }
+    .vote-btn.on { background: var(--gold); border-color: var(--gold); }
+    .vote-btn:hover { border-color: var(--gold); }
+    .vote-btn-time { font-size: 14px; font-weight: 700; }
+    .vote-btn-meta { font-size: 11px; color: var(--muted); margin-top: 2px; font-weight: 400; }
+    .vote-btn.on .vote-btn-meta { color: var(--dark); }
+
+    .commitment-note { background: #fdf3e0; border: 1px solid var(--gold); border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #7a4f00; margin-bottom: 12px; }
+
+    .bar-row { margin-bottom: 12px; }
+    .bar-meta { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 13px; }
+    .bar-track { background: var(--border); border-radius: 4px; height: 8px; }
+    .bar-fill { height: 8px; border-radius: 4px; transition: width 0.4s ease; }
+    .bar-voters { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1rem; }
+    .stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; text-align: center; flex: 1; min-width: 80px; }
+    .stat-num { font-size: 22px; font-weight: 700; }
+    .stat-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-top: 1px; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+    .badge-open { background: #e8f5ee; color: #2d6a4f; }
+    .badge-closed { background: #fee; color: #a33; }
+
+    .dup-warning { background: #fef3e2; border: 1px solid #e67e22; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .dup-warning p { font-size: 13px; color: #7a4400; margin-bottom: 10px; }
+    .dup-warning .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .copy-btn { background: transparent; border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; color: var(--muted); white-space: nowrap; font-family: 'Noto Sans', sans-serif; }
+    .copy-btn:hover { background: var(--bg); color: var(--dark); }
+    .copy-btn.copied { color: #2d6a4f; border-color: #74c69d; }
+
+    @media (max-width: 600px) {
+      .page { padding: 1rem; }
+      .builder-row > div { min-width: 100%; }
+      .recur-opts > div { min-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-header">
+  <img src="logo.png" alt="The Bodgery" class="header-logo" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'">
+  <span id="logo-fallback" class="logo-fallback" style="display:none">BODGERY</span>
+  <div class="logo-divider"></div>
+  <div class="logo-scheduler">Class Scheduler</div>
+</div>
+
+<div class="nav-tabs">
+  <button class="nav-tab active" id="tab-create" onclick="showPage('create',this)">Create Poll</button>
+  <button class="nav-tab" id="tab-vote" onclick="showPage('vote',this)">Vote on Poll</button>
+  <button class="nav-tab" id="tab-results" onclick="showPage('results',this)">View Results</button>
+</div>
+
+<!-- CREATE PAGE -->
+<div id="page-create" class="page active">
+  <div class="section-title">Create a Class Poll</div>
+  <div class="section-sub">Define your available times, then share the voting link with members via Slack.</div>
+  <div id="create-success" style="display:none"></div>
+  <div class="card">
+    <div class="card-title">Event Details</div>
+    <label>Class / Event Name</label>
+    <input type="text" id="ev-name" placeholder="e.g. Wheel Throwing Check-off">
+    <label>Your Name (Instructor)</label>
+    <input type="text" id="ev-instructor" placeholder="e.g. Jane Smith">
+    <label>Description</label>
+    <textarea id="ev-desc" placeholder="Brief description of the class..."></textarea>
+    <label>Voting Deadline (optional)</label>
+    <input type="date" id="ev-deadline">
+  </div>
+  <div class="card">
+    <div class="card-title">Conflict Checking — iCal Feeds (optional)</div>
+    <p class="hint" style="margin-bottom:10px;">Paste iCal URLs from your TeamUp calendar or the Bodgery WordPress events feed.</p>
+    <div class="ical-rows" id="ical-rows">
+      <div class="ical-row">
+        <input type="url" class="ical-input" placeholder="https://teamup.com/.../ical/... or /events/feed/?ical=1">
+        <button class="btn btn-ghost btn-sm" onclick="removeIcalRow(this)">Remove</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" onclick="addIcalRow()">+ Add feed</button>
+      <button class="btn btn-gold btn-sm" onclick="fetchIcals()" id="fetch-btn">Check for conflicts</button>
+      <span id="ical-status" style="font-size:11px;"></span>
+    </div>
+    <p class="hint" style="margin-top:8px;">TeamUp: open calendar → Share → iCal link. WordPress: try appending <code style="font-size:10px;">/events/feed/?ical=1</code> to the site URL.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">Your Available Time Slots</div>
+    <p class="hint" style="margin-bottom:10px;">Build one time range at a time. Toggle "Recurring" for multi-week classes.</p>
+    <div class="slot-list" id="slot-list"></div>
+    <div class="slot-builder">
+      <div class="builder-row">
+        <div><label>Start</label><input type="time" id="b-start" value="18:00"></div>
+        <div><label>End</label><input type="time" id="b-end" value="20:00"></div>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="b-recur" onchange="toggleRecur()">
+          <span class="toggle-track"></span>
+        </label>
+        <span class="toggle-label">Recurring class (multi-week)</span>
+      </div>
+      <div id="single-opts">
+        <div class="builder-row">
+          <div><label>From date</label><input type="date" id="b-from"></div>
+          <div><label>To date</label><input type="date" id="b-to"></div>
+        </div>
+        <div>
+          <label style="margin-bottom:6px;">Days of week</label>
+          <div class="day-chips" id="day-chips-single">
+            <div class="day-chip" data-d="0" onclick="this.classList.toggle('on')">Sun</div>
+            <div class="day-chip" data-d="1" onclick="this.classList.toggle('on')">Mon</div>
+            <div class="day-chip" data-d="2" onclick="this.classList.toggle('on')">Tue</div>
+            <div class="day-chip" data-d="3" onclick="this.classList.toggle('on')">Wed</div>
+            <div class="day-chip" data-d="4" onclick="this.classList.toggle('on')">Thu</div>
+            <div class="day-chip" data-d="5" onclick="this.classList.toggle('on')">Fri</div>
+            <div class="day-chip" data-d="6" onclick="this.classList.toggle('on')">Sat</div>
+          </div>
+        </div>
+      </div>
+      <div id="recur-opts" style="display:none;">
+        <div class="recur-opts">
+          <div><label>Start date (first session)</label><input type="date" id="b-recur-start"></div>
+          <div>
+            <label>Day of week</label>
+            <div class="day-chips" id="day-chips-recur" style="margin-top:4px;">
+              <div class="day-chip" data-d="0" onclick="selectRecurDay(this)">Sun</div>
+              <div class="day-chip" data-d="1" onclick="selectRecurDay(this)">Mon</div>
+              <div class="day-chip" data-d="2" onclick="selectRecurDay(this)">Tue</div>
+              <div class="day-chip" data-d="3" onclick="selectRecurDay(this)">Wed</div>
+              <div class="day-chip" data-d="4" onclick="selectRecurDay(this)">Thu</div>
+              <div class="day-chip" data-d="5" onclick="selectRecurDay(this)">Fri</div>
+              <div class="day-chip" data-d="6" onclick="selectRecurDay(this)">Sat</div>
+            </div>
+          </div>
+          <div style="max-width:100px;"><label>Weeks</label><input type="number" id="b-weeks" value="4" min="2" max="26"></div>
+        </div>
+        <p class="hint" style="margin-top:8px;">Members vote on this day/time pattern. A vote means they can commit to all sessions.</p>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-secondary btn-sm" onclick="addSlot()">Add Time Slot</button>
+        <span id="slot-err" style="font-size:11px;color:#c0392b;"></span>
+      </div>
+    </div>
+  </div>
+  <div class="card" id="cal-card" style="display:none">
+    <div class="card-title">Calendar Preview</div>
+    <div class="legend">
+      <span><span class="ldot" style="background:#e8f5ee;border:1px solid #74c69d;"></span>Available</span>
+      <span><span class="ldot" style="background:#fdf3e0;border:1px solid #E8B15B;"></span>Recurring series</span>
+      <span><span class="ldot" style="background:#fde8e4;border:1px solid #E87E5B;"></span>iCal conflict</span>
+    </div>
+    <div class="cal-nav">
+      <button class="btn btn-ghost btn-sm" onclick="navCal(-1)">&#8592;</button>
+      <span class="cal-title" id="cal-title"></span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="view-toggle">
+          <button class="view-btn on" id="vb-month" onclick="setView('month')">Month</button>
+          <button class="view-btn" id="vb-week" onclick="setView('week')">Week</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="navCal(1)">&#8594;</button>
+      </div>
+    </div>
+    <div id="cal-body"></div>
+  </div>
+  <button class="btn btn-primary" onclick="createPoll()" id="create-btn">Create Poll &amp; Get Share Links</button>
+</div>
+
+<!-- VOTE PAGE -->
+<div id="page-vote" class="page">
+  <div class="section-title">Vote on a Poll</div>
+  <div class="section-sub">Select every time option that works for you.</div>
+  <div id="vote-id-card" class="card">
+    <label>Poll ID</label>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="vote-id" placeholder="Paste poll ID here..." style="flex:1;font-family:monospace;font-size:12px;">
+      <button class="btn btn-secondary" onclick="loadVote()">Load Poll</button>
+    </div>
+  </div>
+  <div id="vote-content"></div>
+</div>
+
+<!-- RESULTS PAGE -->
+<div id="page-results" class="page">
+  <div class="section-title">Poll Results</div>
+  <div class="section-sub">View live vote counts. Keep your Results Token private.</div>
+  <div id="results-token-card" class="card">
+    <label>Results Token</label>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="res-token" placeholder="Paste results token here..." style="flex:1;font-family:monospace;font-size:12px;">
+      <button class="btn btn-secondary" onclick="loadResults()">Load Results</button>
+    </div>
+  </div>
+  <div id="res-content"></div>
+</div>
+
+<script>
+const SB='https://kjdefsaerfzynsnfzqus.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtqZGVmc2FlcmZ6eW5zbmZ6cXVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTA4MDAsImV4cCI6MjA4OTA4NjgwMH0.rdg7j8iDhfFJiJrIk-2M25eSPbtsMByCxg706iIEfMc';
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const PROXIES=[
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+];
+
+let slots=[],icalEvts=[],calView='month',calDate=new Date(),voteSelected=new Set();
+
+// ── URL param routing ──────────────────────────────────────────────────────
+function getParams(){return new URLSearchParams(window.location.search);}
+
+function setParam(key,value){
+  const p=new URLSearchParams(window.location.search);
+  if(value){p.set(key,value);}else{p.delete(key);}
+  const newUrl=window.location.pathname+(p.toString()?'?'+p.toString():'');
+  window.history.replaceState({},'',newUrl);
+}
+
+function initFromUrl(){
+  const p=getParams();
+  const voteId=p.get('vote');
+  const resultsToken=p.get('results');
+  if(voteId){
+    showPage('vote',document.getElementById('tab-vote'));
+    document.getElementById('vote-id').value=voteId;
+    loadVote();
+  } else if(resultsToken){
+    showPage('results',document.getElementById('tab-results'));
+    document.getElementById('res-token').value=resultsToken;
+    loadResults();
+  }
+}
+
+// ── Supabase helper ────────────────────────────────────────────────────────
+function api(path,opts={}){
+  return fetch(SB+'/rest/v1/'+path,{
+    method:opts.method||'GET',
+    headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json',Prefer:opts.prefer||'return=representation'},
+    body:opts.body?JSON.stringify(opts.body):undefined
+  }).then(r=>r.json());
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function showPage(id,tab){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(tab) tab.classList.add('active');
+  // Clear URL params when navigating away from vote/results via tabs
+  if(id==='create'){setParam('vote',null);setParam('results',null);}
+}
+
+// ── Copy to clipboard ──────────────────────────────────────────────────────
+function copyText(text,btn){
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent='Copied!';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},2000);
+  });
+}
+
+// ── iCal ───────────────────────────────────────────────────────────────────
+function addIcalRow(){
+  const rows=document.getElementById('ical-rows');
+  const div=document.createElement('div');div.className='ical-row';
+  div.innerHTML='<input type="url" class="ical-input" placeholder="https://..."><button class="btn btn-ghost btn-sm" onclick="removeIcalRow(this)">Remove</button>';
+  rows.appendChild(div);
+}
+function removeIcalRow(btn){if(document.querySelectorAll('.ical-row').length>1)btn.parentElement.remove();}
+
+async function fetchWithProxy(url){
+  for(const proxy of PROXIES){
+    try{
+      const res=await fetch(proxy(url),{signal:AbortSignal.timeout(8000)});
+      if(!res.ok)continue;
+      const txt=await res.text();
+      if(txt.includes('BEGIN:VCALENDAR'))return txt;
+    }catch(e){continue;}
+  }
+  return null;
+}
+
+async function fetchIcals(){
+  const urls=[...document.querySelectorAll('.ical-input')].map(i=>i.value.trim()).filter(Boolean);
+  const status=document.getElementById('ical-status');
+  if(!urls.length){status.textContent='No URLs entered.';status.style.color='var(--muted)';return;}
+  const btn=document.getElementById('fetch-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Fetching...';
+  status.textContent='';icalEvts=[];
+  let ok=0,fail=0;
+  for(const url of urls){const txt=await fetchWithProxy(url);if(txt){parseIcal(txt);ok++;}else fail++;}
+  btn.disabled=false;btn.innerHTML='Check for conflicts';
+  if(fail&&!ok){status.style.color='#c0392b';status.textContent='Could not fetch — calendar may block external requests.';}
+  else if(fail){status.style.color='#b07d00';status.textContent=ok+' loaded, '+fail+' failed.';}
+  else{status.style.color='#2d6a4f';status.textContent=ok+' feed'+(ok!==1?'s':'')+' loaded · '+icalEvts.length+' events found.';}
+  if(slots.length)renderCal();
+}
+
+function parseIcal(txt){
+  txt.split('BEGIN:VEVENT').slice(1).forEach(block=>{
+    const ds=block.match(/DTSTART[^:]*:(\d{8}T?\d*)/),de=block.match(/DTEND[^:]*:(\d{8}T?\d*)/);
+    if(!ds||!de)return;
+    const s=parseIcalDt(ds[1]),e=parseIcalDt(de[1]);
+    if(s&&e)icalEvts.push({date:s.date,start:s.time,end:e.time});
+  });
+}
+function parseIcalDt(raw){
+  const yr=raw.slice(0,4),mo=raw.slice(4,6),dy=raw.slice(6,8);
+  if(raw.includes('T'))return{date:`${yr}-${mo}-${dy}`,time:`${raw.slice(9,11)}:${raw.slice(11,13)}`};
+  return{date:`${yr}-${mo}-${dy}`,time:'00:00'};
+}
+function isConflict(date,start,end){return icalEvts.some(e=>e.date===date&&e.start<end&&e.end>start);}
+
+// ── Formatting ─────────────────────────────────────────────────────────────
+function fmt(t){
+  if(!t)return'';
+  const[h,m]=t.split(':');const hr=+h;const ap=hr>=12?'PM':'AM';const h12=hr%12||12;
+  return h12+(m&&m!=='00'?':'+m:'')+' '+ap;
+}
+function genUUID(){return'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});}
+
+// ── Slot builder ───────────────────────────────────────────────────────────
+function toggleRecur(){
+  const on=document.getElementById('b-recur').checked;
+  document.getElementById('single-opts').style.display=on?'none':'block';
+  document.getElementById('recur-opts').style.display=on?'block':'none';
+}
+function selectRecurDay(el){
+  document.querySelectorAll('#day-chips-recur .day-chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+}
+
+function addSlot(){
+  const s=document.getElementById('b-start').value,e=document.getElementById('b-end').value;
+  const isRecur=document.getElementById('b-recur').checked;
+  const err=document.getElementById('slot-err');
+  if(!s||!e){err.textContent='Set start and end times.';return;}
+  if(s>=e){err.textContent='End must be after start.';return;}
+  if(isRecur){
+    const rs=document.getElementById('b-recur-start').value;
+    const weeks=parseInt(document.getElementById('b-weeks').value)||4;
+    const dayEl=document.querySelector('#day-chips-recur .day-chip.on');
+    if(!rs){err.textContent='Set a start date.';return;}
+    if(!dayEl){err.textContent='Select a day of week.';return;}
+    const day=+dayEl.dataset.d;
+    if(new Date(rs+'T00:00:00').getDay()!==day){err.textContent='Start date must fall on the selected day.';return;}
+    err.textContent='';
+    slots.push({s,e,isRecur:true,recurStart:rs,recurDay:day,weeks,recurGroup:genUUID()});
+  } else {
+    const f=document.getElementById('b-from').value,t=document.getElementById('b-to').value;
+    const days=[...document.querySelectorAll('#day-chips-single .day-chip.on')].map(d=>+d.dataset.d);
+    if(!f||!t){err.textContent='Set date range.';return;}
+    if(f>t){err.textContent='End date must be after start date.';return;}
+    if(!days.length){err.textContent='Select at least one day.';return;}
+    err.textContent='';
+    slots.push({s,e,isRecur:false,f,t,days});
+  }
+  if(slots.length===1){const fd=slots[0].isRecur?slots[0].recurStart:slots[0].f;const d=new Date(fd+'T00:00:00');calDate=new Date(d.getFullYear(),d.getMonth(),1);}
+  renderSlotList();renderCal();
+  document.getElementById('cal-card').style.display='block';
+  document.querySelectorAll('.day-chip').forEach(c=>c.classList.remove('on'));
+}
+
+function removeSlot(i){
+  slots.splice(i,1);renderSlotList();renderCal();
+  if(!slots.length)document.getElementById('cal-card').style.display='none';
+}
+
+function renderSlotList(){
+  document.getElementById('slot-list').innerHTML=slots.map((s,i)=>{
+    if(s.isRecur){
+      const d=new Date(s.recurStart+'T00:00:00');
+      return`<div class="slot-item"><div><div class="slot-label">${fmt(s.s)} – ${fmt(s.e)} <span class="recur-badge">${s.weeks}-week series</span></div><div class="slot-meta">${DAYS[s.recurDay]}s · starts ${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})} · ${s.weeks} sessions</div></div><button class="btn btn-ghost btn-sm" onclick="removeSlot(${i})">Remove</button></div>`;
+    }
+    return`<div class="slot-item"><div><div class="slot-label">${fmt(s.s)} – ${fmt(s.e)}</div><div class="slot-meta">${s.days.map(d=>DAYS[d]).join(', ')} · ${s.f} to ${s.t}</div></div><button class="btn btn-ghost btn-sm" onclick="removeSlot(${i})">Remove</button></div>`;
+  }).join('');
+}
+
+function expandSlot(slot){
+  if(slot.isRecur){
+    const out=[],cur=new Date(slot.recurStart+'T00:00:00');
+    for(let w=0;w<slot.weeks;w++){
+      out.push({date:cur.toISOString().split('T')[0],start:slot.s,end:slot.e,isRecur:true,recurGroup:slot.recurGroup,weeks:slot.weeks,recurDay:slot.recurDay,recurStart:slot.recurStart});
+      cur.setDate(cur.getDate()+7);
+    }
+    return out;
+  }
+  const out=[],cur=new Date(slot.f+'T00:00:00'),end=new Date(slot.t+'T00:00:00');
+  while(cur<=end){if(slot.days.includes(cur.getDay()))out.push({date:cur.toISOString().split('T')[0],start:slot.s,end:slot.e,isRecur:false});cur.setDate(cur.getDate()+1);}
+  return out;
+}
+function allExpanded(){return slots.flatMap(expandSlot);}
+function byDateMap(){const m={};allExpanded().forEach(s=>{(m[s.date]=m[s.date]||[]).push(s);});return m;}
+
+// ── Calendar ───────────────────────────────────────────────────────────────
+function setView(v){calView=v;document.getElementById('vb-month').classList.toggle('on',v==='month');document.getElementById('vb-week').classList.toggle('on',v==='week');renderCal();}
+function navCal(dir){if(calView==='month')calDate.setMonth(calDate.getMonth()+dir);else calDate.setDate(calDate.getDate()+7*dir);renderCal();}
+
+function renderCal(){
+  const body=document.getElementById('cal-body'),title=document.getElementById('cal-title');
+  const byd=byDateMap(),today=new Date().toISOString().split('T')[0];
+  if(calView==='month'){
+    title.textContent=MONTHS[calDate.getMonth()]+' '+calDate.getFullYear();
+    const yr=calDate.getFullYear(),mo=calDate.getMonth(),last=new Date(yr,mo+1,0);
+    let cur=new Date(yr,mo,1);cur.setDate(cur.getDate()-cur.getDay());
+    let html='<table class="cal-grid"><thead><tr>'+DAYS.map(d=>`<th>${d}</th>`).join('')+'</tr></thead><tbody>';
+    while(cur<=last||(cur.getDay()!==0)){
+      if(cur.getDay()===0)html+='<tr>';
+      const ds=cur.toISOString().split('T')[0];
+      const cls=(cur.getMonth()!==mo?' other':'')+(ds===today?' today':'');
+      html+=`<td><div class="cal-day${cls}"><div class="day-num">${cur.getDate()}</div>`;
+      (byd[ds]||[]).forEach(s=>{const c=isConflict(ds,s.start,s.end);const pc=c?'conflict':s.isRecur?'avail-recur':'avail';html+=`<span class="pill ${pc}">${fmt(s.start)}–${fmt(s.end)}${s.isRecur?' ↻':''}</span>`;});
+      html+='</div></td>';
+      if(cur.getDay()===6)html+='</tr>';
+      cur.setDate(cur.getDate()+1);
+    }
+    html+='</tbody></table>';body.innerHTML=html;
+  } else {
+    const ws=new Date(calDate);ws.setDate(ws.getDate()-ws.getDay());
+    const wdates=Array.from({length:7},(_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d;});
+    title.textContent=wdates[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+wdates[6].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const hours=Array.from({length:17},(_,i)=>i+7);
+    let html='<table class="week-tbl"><thead><tr><th style="width:52px;border:1px solid var(--border);"></th>';
+    wdates.forEach(d=>html+=`<th>${DAYS[d.getDay()]}<br><span style="font-weight:400;font-size:10px;">${d.getDate()}</span></th>`);
+    html+='</tr></thead><tbody>';
+    hours.forEach(h=>{
+      html+=`<tr><td class="time-lbl">${fmt(String(h).padStart(2,'0')+':00')}</td>`;
+      wdates.forEach(wd=>{
+        const ds=wd.toISOString().split('T')[0];
+        const slts=(byd[ds]||[]).filter(s=>+s.start.split(':')[0]===h);
+        html+=`<td class="week-cell">`;slts.forEach(s=>{const c=isConflict(ds,s.start,s.end);const bc=c?'conflict':s.isRecur?'avail-recur':'avail';html+=`<div class="week-block ${bc}">${fmt(s.start)}–${fmt(s.end)}</div>`;});html+='</td>';
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table>';body.innerHTML=html;
+  }
+}
+
+// ── Create poll ────────────────────────────────────────────────────────────
+async function createPoll(){
+  const name=document.getElementById('ev-name').value.trim();
+  const instructor=document.getElementById('ev-instructor').value.trim();
+  const desc=document.getElementById('ev-desc').value.trim();
+  const deadline=document.getElementById('ev-deadline').value||null;
+  const ical_urls=[...document.querySelectorAll('.ical-input')].map(i=>i.value.trim()).filter(Boolean);
+  if(!name){alert('Enter an event name.');return;}
+  if(!instructor){alert('Enter your name.');return;}
+  if(!slots.length){alert('Add at least one time slot.');return;}
+  const btn=document.getElementById('create-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Creating...';
+  try{
+    const polls=await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,description:desc,deadline,ical_urls}});
+    const poll=polls[0];
+    const allSlots=slots.flatMap(slot=>expandSlot(slot).map(ex=>({poll_id:poll.id,date:ex.date,start_time:ex.start+':00',end_time:ex.end+':00',recurrence_group:ex.isRecur?ex.recurGroup:null,recurrence_weeks:ex.isRecur?ex.weeks:null})));
+    if(allSlots.length)await api('time_slots',{method:'POST',body:allSlots,prefer:'return=minimal'});
+
+    const base=window.location.origin+window.location.pathname;
+    const voteUrl=`${base}?vote=${poll.id}`;
+    const resultsUrl=`${base}?results=${poll.results_token}`;
+
+    const sd=document.getElementById('create-success');
+    sd.style.display='block';
+    sd.innerHTML=`
+      <div class="success-box"><strong>Poll created!</strong> Share the voting link with members and keep the results link private.</div>
+      <div class="card">
+        <div class="card-title">Member Voting Link — share in Slack</div>
+        <div class="link-box"><span>${voteUrl}</span><button class="copy-btn" onclick="copyText('${voteUrl}',this)">Copy</button></div>
+        <p class="hint">Members open this link to vote directly — no need to copy/paste a poll ID.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">Results Link — keep private</div>
+        <div class="link-box"><span>${resultsUrl}</span><button class="copy-btn" onclick="copyText('${resultsUrl}',this)">Copy</button></div>
+        <p class="hint">Open this link to see live votes and close the poll when ready.</p>
+      </div>`;
+    sd.scrollIntoView({behavior:'smooth'});
+    slots=[];renderSlotList();document.getElementById('cal-card').style.display='none';
+  }catch(e){alert('Error: '+e.message);}
+  btn.disabled=false;btn.innerHTML='Create Poll &amp; Get Share Links';
+}
+
+// ── Vote ───────────────────────────────────────────────────────────────────
+function groupSlotsByRecurrence(slts){
+  const groups={},singles=[];
+  slts.forEach(s=>{if(s.recurrence_group){(groups[s.recurrence_group]=groups[s.recurrence_group]||[]).push(s);}else singles.push(s);});
+  const items=[];
+  Object.entries(groups).forEach(([grp,grpSlots])=>{grpSlots.sort((a,b)=>a.date.localeCompare(b.date));items.push({type:'recur',group:grp,slots:grpSlots,id:'recur_'+grp});});
+  singles.forEach(s=>items.push({type:'single',slot:s,id:s.id}));
+  items.sort((a,b)=>{const da=a.type==='recur'?a.slots[0].date:a.slot.date;const db=b.type==='recur'?b.slots[0].date:b.slot.date;return da.localeCompare(db);});
+  return items;
+}
+
+async function loadVote(){
+  const id=document.getElementById('vote-id').value.trim();
+  const el=document.getElementById('vote-content');
+  if(!id)return;
+  el.innerHTML='<div class="empty">Loading...</div>';
+  setParam('vote',id);
+  try{
+    const polls=await api(`polls?id=eq.${id}&select=*`);
+    if(!polls.length){el.innerHTML='<div class="empty">Poll not found. Check the ID and try again.</div>';return;}
+    const poll=polls[0];
+    if(poll.is_closed){el.innerHTML='<div class="empty">This poll is closed.</div>';return;}
+    const slts=await api(`time_slots?poll_id=eq.${id}&order=date.asc,start_time.asc&select=*`);
+    renderVote(poll,slts,el);
+  }catch(e){el.innerHTML='<div class="empty">Error loading poll. Please try again.</div>';}
+}
+
+function renderVote(poll,slts,el){
+  voteSelected=new Set();
+  const items=groupSlotsByRecurrence(slts);
+  const hasRecur=items.some(i=>i.type==='recur');
+  let html=`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+      <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+poll.deadline:''}</div></div>
+      <span class="badge badge-open">Open</span>
+    </div>
+    ${poll.description?`<p style="margin-top:10px;font-size:14px;">${poll.description}</p>`:''}
+  </div>
+  <div class="card"><div class="card-title">Your Name</div><input type="text" id="voter-name" placeholder="First and last name"></div>
+  <div class="card">
+    <div class="card-title">Select All Options That Work For You</div>
+    ${hasRecur?`<div class="commitment-note">Options marked with ↻ are recurring series. A vote means you can commit to <strong>all sessions</strong> in that series.</div>`:''}
+    <div class="vote-grid">`;
+  items.forEach(item=>{
+    if(item.type==='recur'){
+      const first=item.slots[0],last=item.slots[item.slots.length-1];
+      const fd=new Date(first.date+'T00:00:00'),ld=new Date(last.date+'T00:00:00');
+      html+=`<button class="vote-btn" data-id="${item.id}" data-slot-ids='${JSON.stringify(item.slots.map(s=>s.id))}' onclick="toggleVoteItem(this)">
+        <div class="vote-btn-time">↻ ${DAYS[fd.getDay()]}s ${fmt(first.start_time.slice(0,5))} – ${fmt(first.end_time.slice(0,5))}</div>
+        <div class="vote-btn-meta">${item.slots.length}-week series · ${fd.toLocaleDateString('en-US',{month:'short',day:'numeric'})} through ${ld.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+      </button>`;
+    } else {
+      const s=item.slot,d=new Date(s.date+'T00:00:00');
+      html+=`<button class="vote-btn" data-id="${item.id}" data-slot-ids='${JSON.stringify([s.id])}' onclick="toggleVoteItem(this)">
+        <div class="vote-btn-time">${fmt(s.start_time.slice(0,5))} – ${fmt(s.end_time.slice(0,5))}</div>
+        <div class="vote-btn-meta">${d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
+      </button>`;
+    }
+  });
+  html+=`</div></div>
+  <div id="dup-warning-zone"></div>
+  <button class="btn btn-primary" id="submit-vote-btn" onclick="checkAndSubmit('${poll.id}')">Submit My Availability</button>
+  <div id="vote-msg" style="margin-top:8px;font-size:12px;"></div>`;
+  el.innerHTML=html;
+}
+
+function toggleVoteItem(btn){
+  const id=btn.dataset.id;
+  if(voteSelected.has(id)){voteSelected.delete(id);btn.classList.remove('on');}
+  else{voteSelected.add(id);btn.classList.add('on');}
+}
+
+async function checkAndSubmit(pollId){
+  const name=document.getElementById('voter-name').value.trim();
+  const warnZone=document.getElementById('dup-warning-zone');
+  if(!name){alert('Please enter your name.');return;}
+  if(!voteSelected.size){alert('Please select at least one option.');return;}
+  warnZone.innerHTML='';
+  const existing=await api(`votes?poll_id=eq.${pollId}&select=voter_name`);
+  const nameLower=name.toLowerCase();
+  const dupMatch=existing.find(v=>v.voter_name.toLowerCase()===nameLower);
+  if(dupMatch){
+    warnZone.innerHTML=`<div class="dup-warning">
+      <p>A vote from <strong>${dupMatch.voter_name}</strong> has already been recorded for this poll. If this is a different person, submit anyway. Otherwise check your name.</p>
+      <div class="btn-row">
+        <button class="btn btn-warn" onclick="doSubmit('${pollId}',true)">Submit Anyway</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('dup-warning-zone').innerHTML=''">Go Back</button>
+      </div>
+    </div>`;
+    warnZone.scrollIntoView({behavior:'smooth'});
+    return;
+  }
+  doSubmit(pollId,false);
+}
+
+async function doSubmit(pollId,forced){
+  const name=document.getElementById('voter-name').value.trim();
+  const msg=document.getElementById('vote-msg');
+  const warnZone=document.getElementById('dup-warning-zone');
+  const allSlotIds=[];
+  voteSelected.forEach(id=>{
+    const btn=document.querySelector(`[data-id="${id}"]`);
+    if(btn){JSON.parse(btn.dataset.slotIds||'[]').forEach(sid=>allSlotIds.push(sid));}
+  });
+  msg.textContent='Submitting...';msg.style.color='var(--muted)';
+  try{
+    await api('votes',{method:'POST',body:{poll_id:pollId,voter_name:name,slot_ids:allSlotIds},prefer:'return=minimal'});
+    warnZone.innerHTML='';
+    msg.style.color='#2d6a4f';
+    msg.textContent=forced?'Submitted! Additional vote recorded.':'Submitted! Your availability has been recorded.';
+    document.getElementById('submit-vote-btn').disabled=true;
+  }catch(e){msg.style.color='#c0392b';msg.textContent='Error submitting. Please try again.';}
+}
+
+// ── Results ────────────────────────────────────────────────────────────────
+async function loadResults(){
+  const token=document.getElementById('res-token').value.trim();
+  const el=document.getElementById('res-content');
+  if(!token)return;
+  el.innerHTML='<div class="empty">Loading...</div>';
+  setParam('results',token);
+  try{
+    const polls=await api(`polls?results_token=eq.${token}&select=*`);
+    if(!polls.length){el.innerHTML='<div class="empty">Token not found.</div>';return;}
+    const poll=polls[0];
+    const slts=await api(`time_slots?poll_id=eq.${poll.id}&order=date.asc,start_time.asc&select=*`);
+    const votes=await api(`votes?poll_id=eq.${poll.id}&select=*`);
+    renderResults(poll,slts,votes,el);
+  }catch(e){el.innerHTML='<div class="empty">Error loading results.</div>';}
+}
+
+function renderResults(poll,slts,votes,el){
+  const items=groupSlotsByRecurrence(slts);
+  const counts={},voters={};
+  items.forEach(item=>{counts[item.id]=0;voters[item.id]=[];});
+  votes.forEach(v=>{
+    const vSlots=new Set(v.slot_ids||[]);
+    items.forEach(item=>{
+      const ids=item.type==='recur'?item.slots.map(s=>s.id):[item.slot.id];
+      if(ids.some(sid=>vSlots.has(sid))){counts[item.id]++;voters[item.id].push(v.voter_name);}
+    });
+  });
+  const max=Math.max(...Object.values(counts),1);
+  const sorted=[...items].sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0));
+  const nameCounts={};
+  votes.forEach(v=>{const k=v.voter_name.toLowerCase();nameCounts[k]=(nameCounts[k]||0)+1;});
+  const dupNames=Object.entries(nameCounts).filter(([,c])=>c>1).map(([n])=>votes.find(v=>v.voter_name.toLowerCase()===n).voter_name);
+
+  let html=`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
+      <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
+      <div style="font-size:12px;color:var(--muted);">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+poll.deadline:''}</div></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="badge ${poll.is_closed?'badge-closed':'badge-open'}">${poll.is_closed?'Closed':'Open'}</span>
+        <button class="btn ${poll.is_closed?'btn-gold':'btn-danger'} btn-sm" onclick="toggleClose('${poll.id}',${poll.is_closed})">${poll.is_closed?'Reopen Poll':'Close Poll'}</button>
+      </div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="stat-num">${votes.length}</div><div class="stat-lbl">Responses</div></div>
+      <div class="stat-box"><div class="stat-num">${max}</div><div class="stat-lbl">Peak votes</div></div>
+      <div class="stat-box"><div class="stat-num">${items.length}</div><div class="stat-lbl">Options</div></div>
+    </div>
+    ${dupNames.length?`<div style="background:#fef3e2;border:1px solid #e67e22;border-radius:6px;padding:8px 12px;font-size:12px;color:#7a4400;margin-top:4px;">Multiple submissions: ${dupNames.join(', ')} — may be household members.</div>`:''}
+  </div>
+  <div class="card"><div class="card-title">Options Ranked by Availability</div>`;
+
+  sorted.forEach(item=>{
+    const c=counts[item.id]||0,pct=Math.round(c/max*100),isTop=c===max&&c>0;
+    let label='',sublabel='';
+    if(item.type==='recur'){
+      const first=item.slots[0],last=item.slots[item.slots.length-1];
+      const fd=new Date(first.date+'T00:00:00'),ld=new Date(last.date+'T00:00:00');
+      label=`↻ ${DAYS[fd.getDay()]}s ${fmt(first.start_time.slice(0,5))}–${fmt(first.end_time.slice(0,5))}`;
+      sublabel=`${item.slots.length}-week series · ${fd.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${ld.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+    } else {
+      const s=item.slot,d=new Date(s.date+'T00:00:00');
+      label=`${d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} · ${fmt(s.start_time.slice(0,5))}–${fmt(s.end_time.slice(0,5))}`;
+    }
+    html+=`<div class="bar-row">
+      <div class="bar-meta">
+        <div><span style="font-weight:700;">${label}${isTop?' ★':''}</span>${sublabel?`<div style="font-size:11px;color:var(--muted);">${sublabel}</div>`:''}</div>
+        <span style="font-weight:700;color:${isTop?'var(--orange)':'var(--text)'};">${c} vote${c!==1?'s':''}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${isTop?'var(--orange)':'var(--gold)'};"></div></div>
+      ${voters[item.id].length?`<div class="bar-voters">${voters[item.id].join(', ')}</div>`:''}
+    </div>`;
+  });
+
+  html+=`</div><div class="card"><div class="card-title">All Responses</div>`;
+  if(votes.length){
+    votes.forEach(v=>{
+      const isDup=nameCounts[v.voter_name.toLowerCase()]>1;
+      html+=`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);align-items:center;">
+        <span style="font-size:13px;font-weight:700;">${v.voter_name}${isDup?' <span style="font-size:10px;color:#e67e22;font-weight:700;margin-left:4px;">multiple</span>':''}</span>
+        <span style="font-size:11px;color:var(--muted);">${new Date(v.created_at).toLocaleDateString()}</span>
+      </div>`;
+    });
+  } else html+='<div class="empty" style="padding:1rem;">No responses yet.</div>';
+  html+='</div>';el.innerHTML=html;
+}
+
+async function toggleClose(pollId,isClosed){
+  await api(`polls?id=eq.${pollId}`,{method:'PATCH',body:{is_closed:!isClosed},prefer:'return=minimal'});
+  loadResults();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+const now=new Date(),pad=n=>String(n).padStart(2,'0');
+document.getElementById('b-from').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+const nm=new Date(now);nm.setMonth(nm.getMonth()+1);
+document.getElementById('b-to').value=`${nm.getFullYear()}-${pad(nm.getMonth()+1)}-${pad(nm.getDate())}`;
+document.getElementById('b-recur-start').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+
+window.addEventListener('DOMContentLoaded', initFromUrl);
+</script>
+</body>
+</html>
