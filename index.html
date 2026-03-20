@@ -363,7 +363,10 @@ function api(path,opts={}){
     method:opts.method||'GET',
     headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json',Prefer:opts.prefer||'return=representation'},
     body:opts.body?JSON.stringify(opts.body):undefined
-  }).then(r=>r.json());
+  }).then(r=>{
+    if(r.status===204||r.headers.get('content-length')==='0') return null;
+    return r.text().then(t=>t?JSON.parse(t):null);
+  });
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────
@@ -574,8 +577,9 @@ async function createPoll(){
   const btn=document.getElementById('create-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Creating...';
   try{
-    const polls=await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,description:desc,deadline,ical_urls}});
-    const poll=polls[0];
+    await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,description:desc,deadline,ical_urls},prefer:'return=minimal'});
+	const pollsResult=await api(`polls?instructor_name=eq.${encodeURIComponent(instructor)}&event_name=eq.${encodeURIComponent(name)}&order=created_at.desc&limit=1&select=*`);
+	const poll=pollsResult[0];
     const allSlots=slots.flatMap(slot=>expandSlot(slot).map(ex=>({poll_id:poll.id,date:ex.date,start_time:ex.start+':00',end_time:ex.end+':00',recurrence_group:ex.isRecur?ex.recurGroup:null,recurrence_weeks:ex.isRecur?ex.weeks:null})));
     if(allSlots.length)await api('time_slots',{method:'POST',body:allSlots,prefer:'return=minimal'});
 
