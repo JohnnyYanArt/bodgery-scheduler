@@ -207,6 +207,10 @@
     .copy-btn { background: transparent; border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; color: var(--muted); white-space: nowrap; font-family: 'Noto Sans', sans-serif; }
     .copy-btn:hover { background: var(--bg); color: var(--dark); }
     .copy-btn.copied { color: #2d6a4f; border-color: #74c69d; }
+    .open-btn { background: var(--gold); border: 1px solid #c8913b; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; color: var(--dark); white-space: nowrap; font-family: 'Noto Sans', sans-serif; }
+    .open-btn:hover { background: var(--orange); color: #fff; border-color: #c05e3b; }
+    .success-highlight { background: #fffbf2; border: 2px solid var(--orange); border-radius: 12px; padding: 1rem; margin-bottom: 1.25rem; box-shadow: 0 4px 12px rgba(232, 126, 91, 0.15); }
+    .success-highlight .card { border-color: var(--gold); background: #fff; }
 
     @media (max-width: 600px) {
       .page { padding: 1rem; }
@@ -233,7 +237,7 @@
 <!-- CREATE PAGE -->
 <div id="page-create" class="page active">
   <div class="section-title">Create a Class Poll</div>
-  <div class="section-sub">Define your available times, then share the voting link with members via Slack.</div>
+  <div class="section-sub">Define your available times, then share the voting link with members.</div>
   <div id="create-success" style="display:none"></div>
   <div class="card">
     <div class="card-title">Event Details</div>
@@ -722,18 +726,20 @@ async function createPoll(){
     const sd=document.getElementById('create-success');
     sd.style.display='block';
     sd.innerHTML=`
-      <div class="success-box"><strong>Poll created!</strong> Share the voting link with members and keep the results link private.</div>
-      <div class="card">
-        <div class="card-title">Member Voting Link — share in Slack</div>
-        <div class="link-box"><span>${voteUrl}</span><button class="copy-btn" onclick="copyText('${voteUrl}',this)">Copy</button></div>
-        <p class="hint">Members open this link to vote directly — no need to copy/paste a poll ID.</p>
-      </div>
-      <div class="card">
-        <div class="card-title">Results Link — keep private</div>
-        <div class="link-box"><span>${resultsUrl}</span><button class="copy-btn" onclick="copyText('${resultsUrl}',this)">Copy</button></div>
-        <p class="hint">Open this link to see live votes and close the poll when ready.</p>
+      <div class="success-highlight">
+        <div class="success-box"><strong>Poll created!</strong> Share the voting link with members and keep the results link private.</div>
+        <div class="card">
+          <div class="card-title">Member Voting Link — share with members</div>
+          <div class="link-box"><span>${voteUrl}</span><button class="copy-btn" onclick="copyText('${voteUrl}',this)">Copy</button><button class="open-btn" onclick="window.open('${voteUrl}','_blank')">Open</button></div>
+          <p class="hint">Members open this link to vote directly — no need to copy/paste a poll ID.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">Results Link — keep private</div>
+          <div class="link-box"><span>${resultsUrl}</span><button class="copy-btn" onclick="copyText('${resultsUrl}',this)">Copy</button><button class="open-btn" onclick="window.open('${resultsUrl}','_blank')">Open</button></div>
+          <p class="hint">Open this link to see live votes, edit the poll, or close it when ready.</p>
+        </div>
       </div>`;
-    sd.scrollIntoView({behavior:'smooth'});
+    window.scrollTo({top:0,behavior:'smooth'});
     slots=[];excludedSlots=new Set();renderSlotList();document.getElementById('cal-card').style.display='none';
     document.getElementById('exclude-conflicts-row').style.display='none';
   }catch(e){alert('Error: '+e.message);}
@@ -976,12 +982,15 @@ async function loadResults(){
     const poll=polls[0];
     const slts=await api(`time_slots?poll_id=eq.${poll.id}&order=date.asc,start_time.asc&select=*`);
     const votes=await api(`votes?poll_id=eq.${poll.id}&select=*`);
+    currentResultsPoll=poll;
+    currentResultsSlots=slts;
     renderResults(poll,slts,votes,el);
   }catch(e){el.innerHTML='<div class="empty">Error loading results.</div>';}
 }
 
 // ── Results calendar state ─────────────────────────────────────────────────
 let rCalDate=new Date(), rCalItems=[], rCalCounts={}, rCalVoters={}, rCalMax=1;
+let currentResultsPoll=null, currentResultsSlots=[];
 
 function renderResults(poll,slts,votes,el){
   const items=groupSlotsByRecurrence(slts);
@@ -1012,12 +1021,16 @@ function renderResults(poll,slts,votes,el){
   let html=`<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
       <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
-      <div style="font-size:12px;color:var(--muted);">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+poll.deadline:''}</div></div>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div style="font-size:12px;color:var(--muted);">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+poll.deadline:''}</div>
+      ${poll.description?`<div style="font-size:12px;color:var(--muted);margin-top:4px;">${poll.description}</div>`:''}</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <span class="badge ${poll.is_closed?'badge-closed':'badge-open'}">${poll.is_closed?'Closed':'Open'}</span>
+        <button class="btn btn-ghost btn-sm" onclick="openEditPoll()">Edit Poll</button>
+        <button class="btn btn-ghost btn-sm" onclick="duplicatePoll()">Duplicate</button>
         <button class="btn ${poll.is_closed?'btn-gold':'btn-danger'} btn-sm" onclick="toggleClose('${poll.id}',${poll.is_closed})">${poll.is_closed?'Reopen Poll':'Close Poll'}</button>
       </div>
     </div>
+    <div id="edit-poll-panel" style="display:none;"></div>
     <div class="stat-row">
       <div class="stat-box"><div class="stat-num">${votes.length}</div><div class="stat-lbl">Responses</div></div>
       <div class="stat-box"><div class="stat-num">${rCalMax}</div><div class="stat-lbl">Peak votes</div></div>
@@ -1196,11 +1209,172 @@ async function toggleClose(pollId,isClosed){
   loadResults();
 }
 
+// ── Edit poll (results page) ───────────────────────────────────────────────
+function openEditPoll(){
+  const p=currentResultsPoll;if(!p)return;
+  const panel=document.getElementById('edit-poll-panel');
+  if(panel.style.display==='block'){panel.style.display='none';return;}
+  panel.style.display='block';
+  const singles=currentResultsSlots.filter(s=>!s.recurrence_group);
+  const recurGroups={};
+  currentResultsSlots.filter(s=>s.recurrence_group).forEach(s=>{(recurGroups[s.recurrence_group]=recurGroups[s.recurrence_group]||[]).push(s);});
+  let slotsHtml='';
+  singles.forEach(s=>{
+    const d=new Date(s.date+'T00:00:00');
+    slotsHtml+=`<div class="slot-item" style="margin-bottom:6px;"><div><div class="slot-label">${d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} · ${fmt(s.start_time.slice(0,5))}–${fmt(s.end_time.slice(0,5))}</div></div><button class="btn btn-ghost btn-sm" onclick="deleteSlotFromEdit('${s.id}')">Remove</button></div>`;
+  });
+  Object.entries(recurGroups).forEach(([grp,grpSlots])=>{
+    grpSlots.sort((a,b)=>a.date.localeCompare(b.date));
+    const first=grpSlots[0];
+    const fd=new Date(first.date+'T00:00:00');
+    slotsHtml+=`<div class="slot-item" style="margin-bottom:6px;"><div><div class="slot-label">↻ ${DAYS[fd.getDay()]}s ${fmt(first.start_time.slice(0,5))}–${fmt(first.end_time.slice(0,5))} <span class="recur-badge">${grpSlots.length}-week series</span></div><div class="slot-meta">starts ${fd.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><button class="btn btn-ghost btn-sm" onclick="deleteRecurGroupFromEdit('${grp}')">Remove series</button></div>`;
+  });
+  panel.innerHTML=`
+    <div style="background:#fffbf2;border:2px solid var(--gold);border-radius:8px;padding:1rem;margin-top:1rem;">
+      <div class="card-title" style="margin-bottom:10px;">Edit Poll Details</div>
+      <label>Class / Event Name</label>
+      <input type="text" id="edit-name" value="${(p.event_name||'').replace(/"/g,'&quot;')}">
+      <label>Instructor Name</label>
+      <input type="text" id="edit-instructor" value="${(p.instructor_name||'').replace(/"/g,'&quot;')}">
+      <label>Description</label>
+      <textarea id="edit-desc">${p.description||''}</textarea>
+      <label>Voting Deadline</label>
+      <input type="date" id="edit-deadline" value="${p.deadline||''}">
+      <div style="margin-top:14px;">
+        <div class="card-title" style="margin-bottom:8px;">Time Slots</div>
+        ${slotsHtml||'<p class="hint">No slots yet.</p>'}
+        <div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:10px;">
+          <div style="font-size:12px;font-weight:700;margin-bottom:6px;">Add a single slot</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+            <div style="flex:1;min-width:120px;"><label style="font-size:11px;">Date</label><input type="date" id="new-slot-date"></div>
+            <div style="min-width:100px;"><label style="font-size:11px;">Start</label><input type="time" id="new-slot-start" value="18:00"></div>
+            <div style="min-width:100px;"><label style="font-size:11px;">End</label><input type="time" id="new-slot-end" value="20:00"></div>
+            <button class="btn btn-secondary btn-sm" onclick="addSlotInEdit()">Add Slot</button>
+          </div>
+        </div>
+        <p class="hint" style="margin-top:8px;">Note: removing a slot that already has votes will drop those vote counts for that slot. Adding/editing slots does not notify members who already voted.</p>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button class="btn btn-primary btn-sm" onclick="saveEditPoll()">Save Details</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('edit-poll-panel').style.display='none'">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function saveEditPoll(){
+  const p=currentResultsPoll;if(!p)return;
+  const body={
+    event_name:document.getElementById('edit-name').value.trim(),
+    instructor_name:document.getElementById('edit-instructor').value.trim(),
+    description:document.getElementById('edit-desc').value.trim(),
+    deadline:document.getElementById('edit-deadline').value||null
+  };
+  if(!body.event_name||!body.instructor_name){alert('Event name and instructor are required.');return;}
+  try{
+    await api(`polls?id=eq.${p.id}`,{method:'PATCH',body,prefer:'return=minimal'});
+    await loadResults();
+  }catch(e){alert('Error saving: '+e.message);}
+}
+
+async function deleteSlotFromEdit(slotId){
+  if(!confirm('Remove this time slot? Any existing votes for it will be dropped from the results.'))return;
+  try{
+    await api(`time_slots?id=eq.${slotId}`,{method:'DELETE',prefer:'return=minimal'});
+    await loadResults();
+    openEditPoll();
+  }catch(e){alert('Error removing slot: '+e.message);}
+}
+
+async function deleteRecurGroupFromEdit(groupId){
+  if(!confirm('Remove this entire recurring series? Any existing votes for it will be dropped from the results.'))return;
+  try{
+    await api(`time_slots?recurrence_group=eq.${groupId}`,{method:'DELETE',prefer:'return=minimal'});
+    await loadResults();
+    openEditPoll();
+  }catch(e){alert('Error removing series: '+e.message);}
+}
+
+async function addSlotInEdit(){
+  const p=currentResultsPoll;if(!p)return;
+  const date=document.getElementById('new-slot-date').value;
+  const start=document.getElementById('new-slot-start').value;
+  const end=document.getElementById('new-slot-end').value;
+  if(!date||!start||!end){alert('Date, start, and end are required.');return;}
+  if(start>=end){alert('End time must be after start time.');return;}
+  try{
+    await api('time_slots',{method:'POST',body:{poll_id:p.id,date,start_time:start+':00',end_time:end+':00',recurrence_group:null,recurrence_weeks:null},prefer:'return=minimal'});
+    await loadResults();
+    openEditPoll();
+  }catch(e){alert('Error adding slot: '+e.message);}
+}
+
+// ── Duplicate poll ─────────────────────────────────────────────────────────
+function duplicatePoll(){
+  const p=currentResultsPoll;if(!p)return;
+  const payload={
+    event_name:p.event_name,
+    instructor_name:p.instructor_name,
+    description:p.description||'',
+    deadline:p.deadline||'',
+    ical_urls:p.ical_urls||[],
+    slots:currentResultsSlots.map(s=>({date:s.date,start_time:s.start_time,end_time:s.end_time,recurrence_group:s.recurrence_group,recurrence_weeks:s.recurrence_weeks}))
+  };
+  try{sessionStorage.setItem('duplicatePoll',JSON.stringify(payload));}catch(e){alert('Could not stash duplicate data: '+e.message);return;}
+  window.location.href=window.location.pathname;
+}
+
+function applyDuplicateIfPresent(){
+  let raw;
+  try{raw=sessionStorage.getItem('duplicatePoll');}catch(e){return;}
+  if(!raw)return;
+  sessionStorage.removeItem('duplicatePoll');
+  let data;try{data=JSON.parse(raw);}catch(e){return;}
+  document.getElementById('ev-name').value=data.event_name||'';
+  document.getElementById('ev-instructor').value=data.instructor_name||'';
+  document.getElementById('ev-desc').value=data.description||'';
+  document.getElementById('ev-deadline').value=data.deadline||'';
+  if(data.ical_urls&&data.ical_urls.length){
+    const rows=document.getElementById('ical-rows');
+    rows.innerHTML='';
+    data.ical_urls.forEach(u=>{
+      const row=document.createElement('div');
+      row.className='ical-row';
+      row.innerHTML=`<input type="url" class="ical-input" value="${u.replace(/"/g,'&quot;')}" placeholder="https://..."><button class="btn btn-ghost btn-sm" onclick="removeIcalRow(this)">Remove</button>`;
+      rows.appendChild(row);
+    });
+  }
+  // Rebuild slots array from duplicated slot rows
+  const singles=(data.slots||[]).filter(s=>!s.recurrence_group);
+  const recurByGroup={};
+  (data.slots||[]).filter(s=>s.recurrence_group).forEach(s=>{(recurByGroup[s.recurrence_group]=recurByGroup[s.recurrence_group]||[]).push(s);});
+  singles.forEach(sl=>{
+    slots.push({s:sl.start_time.slice(0,5),e:sl.end_time.slice(0,5),isRecur:false,f:sl.date,t:sl.date,days:[new Date(sl.date+'T00:00:00').getDay()]});
+  });
+  Object.values(recurByGroup).forEach(grpSlots=>{
+    grpSlots.sort((a,b)=>a.date.localeCompare(b.date));
+    const first=grpSlots[0];
+    const fd=new Date(first.date+'T00:00:00');
+    slots.push({s:first.start_time.slice(0,5),e:first.end_time.slice(0,5),isRecur:true,recurStart:first.date,recurDay:fd.getDay(),weeks:grpSlots.length,recurGroup:genUUID()});
+  });
+  if(slots.length){
+    const fd=slots[0].isRecur?slots[0].recurStart:slots[0].f;
+    const d=new Date(fd+'T00:00:00');
+    calDate=new Date(d.getFullYear(),d.getMonth(),1);
+    renderSlotList();document.getElementById('cal-card').style.display='block';renderCal();
+  }
+  const note=document.createElement('div');
+  note.className='success-box';
+  note.innerHTML='<strong>Duplicated from existing poll.</strong> Review the details and slots, then create to save a new poll.';
+  document.getElementById('create-success').style.display='block';
+  document.getElementById('create-success').innerHTML='';
+  document.getElementById('create-success').appendChild(note);
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 const now=new Date(),pad=n=>String(n).padStart(2,'0');
 document.getElementById('b-recur-start').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
 
-window.addEventListener('DOMContentLoaded', initFromUrl);
+window.addEventListener('DOMContentLoaded', ()=>{initFromUrl();applyDuplicateIfPresent();});
 </script>
 </body>
 </html>
