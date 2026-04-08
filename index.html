@@ -209,6 +209,8 @@
     .copy-btn.copied { color: #2d6a4f; border-color: #74c69d; }
     .open-btn { background: var(--gold); border: 1px solid #c8913b; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; color: var(--dark); white-space: nowrap; font-family: 'Noto Sans', sans-serif; }
     .open-btn:hover { background: var(--orange); color: #fff; border-color: #c05e3b; }
+    .btn-green { background: #52b788; color: #fff; border: 1px solid #2d6a4f; }
+    .btn-green:hover { background: #40916c; }
     .success-highlight { background: #fffbf2; border: 2px solid var(--orange); border-radius: 12px; padding: 1rem; margin-bottom: 1.25rem; box-shadow: 0 4px 12px rgba(232, 126, 91, 0.15); }
     .success-highlight .card { border-color: var(--gold); background: #fff; }
 
@@ -1286,7 +1288,7 @@ function renderEditPanel(){
             <div style="flex:1;min-width:120px;"><label style="font-size:11px;">Date</label><input type="date" id="new-slot-date"></div>
             <div style="min-width:100px;"><label style="font-size:11px;">Start</label><input type="time" id="new-slot-start" value="18:00"></div>
             <div style="min-width:100px;"><label style="font-size:11px;">End</label><input type="time" id="new-slot-end" value="20:00"></div>
-            <button class="btn btn-secondary btn-sm" onclick="stageAddSlot()">Stage Slot</button>
+            <button class="btn btn-green btn-sm" onclick="stageAddSlot()">Add Slot</button>
           </div>
         </div>
         <p class="hint" style="margin-top:8px;">Changes are staged until you click <strong>Save Details</strong>. Removing a slot that already has votes will drop those vote counts for that slot.</p>
