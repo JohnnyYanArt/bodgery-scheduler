@@ -1210,36 +1210,73 @@ async function toggleClose(pollId,isClosed){
 }
 
 // ── Edit poll (results page) ───────────────────────────────────────────────
+let editRemoveSlots=new Set(), editRemoveGroups=new Set(), editAdds=[];
+let editFormState=null; // {name,instructor,desc,deadline} preserved across re-renders
+
+function captureEditFormState(){
+  const n=document.getElementById('edit-name');
+  if(!n)return;
+  editFormState={
+    name:n.value,
+    instructor:document.getElementById('edit-instructor').value,
+    desc:document.getElementById('edit-desc').value,
+    deadline:document.getElementById('edit-deadline').value
+  };
+}
+
 function openEditPoll(){
   const p=currentResultsPoll;if(!p)return;
   const panel=document.getElementById('edit-poll-panel');
   if(panel.style.display==='block'){panel.style.display='none';return;}
   panel.style.display='block';
+  editRemoveSlots=new Set();
+  editRemoveGroups=new Set();
+  editAdds=[];
+  editFormState=null;
+  renderEditPanel();
+}
+
+function renderEditPanel(){
+  const p=currentResultsPoll;if(!p)return;
+  const panel=document.getElementById('edit-poll-panel');
+  if(!panel)return;
+  const fs=editFormState||{name:p.event_name||'',instructor:p.instructor_name||'',desc:p.description||'',deadline:p.deadline||''};
   const singles=currentResultsSlots.filter(s=>!s.recurrence_group);
   const recurGroups={};
   currentResultsSlots.filter(s=>s.recurrence_group).forEach(s=>{(recurGroups[s.recurrence_group]=recurGroups[s.recurrence_group]||[]).push(s);});
   let slotsHtml='';
   singles.forEach(s=>{
     const d=new Date(s.date+'T00:00:00');
-    slotsHtml+=`<div class="slot-item" style="margin-bottom:6px;"><div><div class="slot-label">${d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} · ${fmt(s.start_time.slice(0,5))}–${fmt(s.end_time.slice(0,5))}</div></div><button class="btn btn-ghost btn-sm" onclick="deleteSlotFromEdit('${s.id}')">Remove</button></div>`;
+    const marked=editRemoveSlots.has(s.id);
+    const style=marked?'opacity:0.5;text-decoration:line-through;':'';
+    const btnLabel=marked?'Undo':'Remove';
+    slotsHtml+=`<div class="slot-item" style="margin-bottom:6px;${marked?'background:#fde8e4;border-color:#e87e5b;':''}"><div style="${style}"><div class="slot-label">${d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} · ${fmt(s.start_time.slice(0,5))}–${fmt(s.end_time.slice(0,5))}</div></div><button class="btn btn-ghost btn-sm" onclick="toggleRemoveSlot('${s.id}')">${btnLabel}</button></div>`;
   });
   Object.entries(recurGroups).forEach(([grp,grpSlots])=>{
     grpSlots.sort((a,b)=>a.date.localeCompare(b.date));
     const first=grpSlots[0];
     const fd=new Date(first.date+'T00:00:00');
-    slotsHtml+=`<div class="slot-item" style="margin-bottom:6px;"><div><div class="slot-label">↻ ${DAYS[fd.getDay()]}s ${fmt(first.start_time.slice(0,5))}–${fmt(first.end_time.slice(0,5))} <span class="recur-badge">${grpSlots.length}-week series</span></div><div class="slot-meta">starts ${fd.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><button class="btn btn-ghost btn-sm" onclick="deleteRecurGroupFromEdit('${grp}')">Remove series</button></div>`;
+    const marked=editRemoveGroups.has(grp);
+    const style=marked?'opacity:0.5;text-decoration:line-through;':'';
+    const btnLabel=marked?'Undo':'Remove series';
+    slotsHtml+=`<div class="slot-item" style="margin-bottom:6px;${marked?'background:#fde8e4;border-color:#e87e5b;':''}"><div style="${style}"><div class="slot-label">↻ ${DAYS[fd.getDay()]}s ${fmt(first.start_time.slice(0,5))}–${fmt(first.end_time.slice(0,5))} <span class="recur-badge">${grpSlots.length}-week series</span></div><div class="slot-meta">starts ${fd.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><button class="btn btn-ghost btn-sm" onclick="toggleRemoveGroup('${grp}')">${btnLabel}</button></div>`;
   });
+  editAdds.forEach((a,i)=>{
+    const d=new Date(a.date+'T00:00:00');
+    slotsHtml+=`<div class="slot-item" style="margin-bottom:6px;background:#e8f5ee;border-color:#74c69d;"><div><div class="slot-label">+ ${d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} · ${fmt(a.start_time.slice(0,5))}–${fmt(a.end_time.slice(0,5))}</div><div class="slot-meta" style="color:#2d6a4f;">Pending — saves when you click Save Details</div></div><button class="btn btn-ghost btn-sm" onclick="unstageAddSlot(${i})">Undo</button></div>`;
+  });
+  const pendingCount=editRemoveSlots.size+editRemoveGroups.size+editAdds.length;
   panel.innerHTML=`
     <div style="background:#fffbf2;border:2px solid var(--gold);border-radius:8px;padding:1rem;margin-top:1rem;">
       <div class="card-title" style="margin-bottom:10px;">Edit Poll Details</div>
       <label>Class / Event Name</label>
-      <input type="text" id="edit-name" value="${(p.event_name||'').replace(/"/g,'&quot;')}">
+      <input type="text" id="edit-name" value="${fs.name.replace(/"/g,'&quot;')}">
       <label>Instructor Name</label>
-      <input type="text" id="edit-instructor" value="${(p.instructor_name||'').replace(/"/g,'&quot;')}">
+      <input type="text" id="edit-instructor" value="${fs.instructor.replace(/"/g,'&quot;')}">
       <label>Description</label>
-      <textarea id="edit-desc">${p.description||''}</textarea>
+      <textarea id="edit-desc">${fs.desc}</textarea>
       <label>Voting Deadline</label>
-      <input type="date" id="edit-deadline" value="${p.deadline||''}">
+      <input type="date" id="edit-deadline" value="${fs.deadline}">
       <div style="margin-top:14px;">
         <div class="card-title" style="margin-bottom:8px;">Time Slots</div>
         ${slotsHtml||'<p class="hint">No slots yet.</p>'}
@@ -1249,16 +1286,55 @@ function openEditPoll(){
             <div style="flex:1;min-width:120px;"><label style="font-size:11px;">Date</label><input type="date" id="new-slot-date"></div>
             <div style="min-width:100px;"><label style="font-size:11px;">Start</label><input type="time" id="new-slot-start" value="18:00"></div>
             <div style="min-width:100px;"><label style="font-size:11px;">End</label><input type="time" id="new-slot-end" value="20:00"></div>
-            <button class="btn btn-secondary btn-sm" onclick="addSlotInEdit()">Add Slot</button>
+            <button class="btn btn-secondary btn-sm" onclick="stageAddSlot()">Stage Slot</button>
           </div>
         </div>
-        <p class="hint" style="margin-top:8px;">Note: removing a slot that already has votes will drop those vote counts for that slot. Adding/editing slots does not notify members who already voted.</p>
+        <p class="hint" style="margin-top:8px;">Changes are staged until you click <strong>Save Details</strong>. Removing a slot that already has votes will drop those vote counts for that slot.</p>
       </div>
-      <div style="display:flex;gap:8px;margin-top:14px;">
-        <button class="btn btn-primary btn-sm" onclick="saveEditPoll()">Save Details</button>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('edit-poll-panel').style.display='none'">Cancel</button>
+      <div style="display:flex;gap:8px;margin-top:14px;align-items:center;">
+        <button class="btn btn-primary btn-sm" onclick="saveEditPoll()">Save Details${pendingCount?` (${pendingCount} pending)`:''}</button>
+        <button class="btn btn-ghost btn-sm" onclick="cancelEditPoll()">Cancel</button>
       </div>
     </div>`;
+}
+
+function cancelEditPoll(){
+  editRemoveSlots=new Set();
+  editRemoveGroups=new Set();
+  editAdds=[];
+  editFormState=null;
+  document.getElementById('edit-poll-panel').style.display='none';
+}
+
+function toggleRemoveSlot(slotId){
+  captureEditFormState();
+  if(editRemoveSlots.has(slotId))editRemoveSlots.delete(slotId);
+  else editRemoveSlots.add(slotId);
+  renderEditPanel();
+}
+
+function toggleRemoveGroup(groupId){
+  captureEditFormState();
+  if(editRemoveGroups.has(groupId))editRemoveGroups.delete(groupId);
+  else editRemoveGroups.add(groupId);
+  renderEditPanel();
+}
+
+function stageAddSlot(){
+  const date=document.getElementById('new-slot-date').value;
+  const start=document.getElementById('new-slot-start').value;
+  const end=document.getElementById('new-slot-end').value;
+  if(!date||!start||!end){alert('Date, start, and end are required.');return;}
+  if(start>=end){alert('End time must be after start time.');return;}
+  captureEditFormState();
+  editAdds.push({date,start_time:start+':00',end_time:end+':00'});
+  renderEditPanel();
+}
+
+function unstageAddSlot(i){
+  captureEditFormState();
+  editAdds.splice(i,1);
+  renderEditPanel();
 }
 
 async function saveEditPoll(){
@@ -1272,40 +1348,22 @@ async function saveEditPoll(){
   if(!body.event_name||!body.instructor_name){alert('Event name and instructor are required.');return;}
   try{
     await api(`polls?id=eq.${p.id}`,{method:'PATCH',body,prefer:'return=minimal'});
+    for(const slotId of editRemoveSlots){
+      await api(`time_slots?id=eq.${slotId}`,{method:'DELETE',prefer:'return=minimal'});
+    }
+    for(const groupId of editRemoveGroups){
+      await api(`time_slots?recurrence_group=eq.${groupId}`,{method:'DELETE',prefer:'return=minimal'});
+    }
+    if(editAdds.length){
+      const rows=editAdds.map(a=>({poll_id:p.id,date:a.date,start_time:a.start_time,end_time:a.end_time,recurrence_group:null,recurrence_weeks:null}));
+      await api('time_slots',{method:'POST',body:rows,prefer:'return=minimal'});
+    }
+    editRemoveSlots=new Set();
+    editRemoveGroups=new Set();
+    editAdds=[];
+    editFormState=null;
     await loadResults();
   }catch(e){alert('Error saving: '+e.message);}
-}
-
-async function deleteSlotFromEdit(slotId){
-  if(!confirm('Remove this time slot? Any existing votes for it will be dropped from the results.'))return;
-  try{
-    await api(`time_slots?id=eq.${slotId}`,{method:'DELETE',prefer:'return=minimal'});
-    await loadResults();
-    openEditPoll();
-  }catch(e){alert('Error removing slot: '+e.message);}
-}
-
-async function deleteRecurGroupFromEdit(groupId){
-  if(!confirm('Remove this entire recurring series? Any existing votes for it will be dropped from the results.'))return;
-  try{
-    await api(`time_slots?recurrence_group=eq.${groupId}`,{method:'DELETE',prefer:'return=minimal'});
-    await loadResults();
-    openEditPoll();
-  }catch(e){alert('Error removing series: '+e.message);}
-}
-
-async function addSlotInEdit(){
-  const p=currentResultsPoll;if(!p)return;
-  const date=document.getElementById('new-slot-date').value;
-  const start=document.getElementById('new-slot-start').value;
-  const end=document.getElementById('new-slot-end').value;
-  if(!date||!start||!end){alert('Date, start, and end are required.');return;}
-  if(start>=end){alert('End time must be after start time.');return;}
-  try{
-    await api('time_slots',{method:'POST',body:{poll_id:p.id,date,start_time:start+':00',end_time:end+':00',recurrence_group:null,recurrence_weeks:null},prefer:'return=minimal'});
-    await loadResults();
-    openEditPoll();
-  }catch(e){alert('Error adding slot: '+e.message);}
 }
 
 // ── Duplicate poll ─────────────────────────────────────────────────────────
