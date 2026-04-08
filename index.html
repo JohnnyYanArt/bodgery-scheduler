@@ -389,6 +389,11 @@
       <button class="btn btn-secondary" onclick="loadResults()">Load Results</button>
     </div>
   </div>
+  <div id="results-vote-link-card" class="card" style="display:none;">
+    <div class="card-title">Member Voting Link</div>
+    <div class="link-box" id="results-vote-link-box"></div>
+    <p class="hint">Share this link with members so they can vote.</p>
+  </div>
   <div id="res-content"></div>
 </div>
 
@@ -512,6 +517,7 @@ function parseIcalDt(raw){
   if(raw.includes('T'))return{date:`${yr}-${mo}-${dy}`,time:`${raw.slice(9,11)}:${raw.slice(11,13)}`};
   return{date:`${yr}-${mo}-${dy}`,time:'00:00'};
 }
+function fmtDateUS(yyyymmdd){if(!yyyymmdd)return'';const m=String(yyyymmdd).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[2]}-${m[3]}-${m[1]}`:yyyymmdd;}
 function getConflicts(date,start,end){return icalEvts.filter(e=>e.date===date&&e.start<end&&e.end>start);}
 function isConflict(date,start,end){return getConflicts(date,start,end).length>0;}
 
@@ -800,7 +806,7 @@ function renderVote(poll,slts,el){
   let html=`<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
       <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:2px;">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+poll.deadline:''}</div></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+fmtDateUS(poll.deadline):''}</div></div>
       <span class="badge badge-open">Open</span>
     </div>
     ${poll.description?`<p style="margin-top:10px;font-size:14px;">${poll.description}</p>`:''}
@@ -983,8 +989,10 @@ async function doSubmit(pollId,forced){
 async function loadResults(){
   const token=document.getElementById('res-token').value.trim();
   const el=document.getElementById('res-content');
+  const linkCard=document.getElementById('results-vote-link-card');
   if(!token)return;
   el.innerHTML='<div class="empty">Loading...</div>';
+  linkCard.style.display='none';
   setParam('results',token);
   try{
     const polls=await api(`polls?results_token=eq.${token}&select=*`);
@@ -994,6 +1002,9 @@ async function loadResults(){
     const votes=await api(`votes?poll_id=eq.${poll.id}&select=*`);
     currentResultsPoll=poll;
     currentResultsSlots=slts;
+    const voteUrl=`${window.location.origin+window.location.pathname}?vote=${poll.id}`;
+    document.getElementById('results-vote-link-box').innerHTML=`<span>${voteUrl}</span><button class="copy-btn" onclick="copyText('${voteUrl}',this)">Copy</button><button class="open-btn" onclick="window.open('${voteUrl}','_blank')">Open</button>`;
+    linkCard.style.display='block';
     renderResults(poll,slts,votes,el);
   }catch(e){el.innerHTML='<div class="empty">Error loading results.</div>';}
 }
@@ -1031,7 +1042,7 @@ function renderResults(poll,slts,votes,el){
   let html=`<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
       <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
-      <div style="font-size:12px;color:var(--muted);">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+poll.deadline:''}</div>
+      <div style="font-size:12px;color:var(--muted);">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+fmtDateUS(poll.deadline):''}</div>
       ${poll.description?`<div style="font-size:12px;color:var(--muted);margin-top:4px;">${poll.description}</div>`:''}</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <span class="badge ${poll.is_closed?'badge-closed':'badge-open'}">${poll.is_closed?'Closed':'Open'}</span>
@@ -1041,10 +1052,6 @@ function renderResults(poll,slts,votes,el){
       </div>
     </div>
     <div id="edit-poll-panel" style="display:none;"></div>
-    <div style="margin-bottom:1rem;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Member Voting Link</div>
-      <div class="link-box"><span>${window.location.origin+window.location.pathname}?vote=${poll.id}</span><button class="copy-btn" onclick="copyText('${window.location.origin+window.location.pathname}?vote=${poll.id}',this)">Copy</button><button class="open-btn" onclick="window.open('${window.location.origin+window.location.pathname}?vote=${poll.id}','_blank')">Open</button></div>
-    </div>
     <div class="stat-row">
       <div class="stat-box"><div class="stat-num">${votes.length}</div><div class="stat-lbl">Responses</div></div>
       <div class="stat-box"><div class="stat-num">${rCalMax}</div><div class="stat-lbl">Peak votes</div></div>
