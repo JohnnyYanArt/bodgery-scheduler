@@ -417,12 +417,15 @@ function initFromUrl(){
 }
 
 // ── Supabase helper ────────────────────────────────────────────────────────
-function api(path,opts={}){
-  return fetch(SB+'/rest/v1/'+path,{
+async function api(path,opts={}){
+  const r=await fetch(SB+'/rest/v1/'+path,{
     method:opts.method||'GET',
     headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json',Prefer:opts.prefer||'return=representation'},
     body:opts.body?JSON.stringify(opts.body):undefined
-  }).then(r=>r.json());
+  });
+  const text=await r.text();
+  if(!r.ok) throw new Error(`Supabase ${r.status}: ${text||r.statusText}`);
+  return text?JSON.parse(text):null;
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────
