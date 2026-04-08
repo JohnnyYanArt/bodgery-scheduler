@@ -271,6 +271,14 @@
   <div class="card">
     <div class="card-title">Your Available Time Slots</div>
     <p class="hint" style="margin-bottom:10px;">Build one time range at a time. Toggle "Recurring" for multi-week classes.</p>
+    <div style="background:#fffbf2;border:1px solid var(--gold);border-radius:6px;padding:10px;margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px;">Import slots from another poll (optional)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="import-poll-ref" placeholder="Paste poll link, ID, or results token" style="flex:1;min-width:220px;font-family:monospace;font-size:12px;">
+        <button class="btn btn-gold btn-sm" onclick="importSlotsFromPoll()" id="import-btn">Import Slots</button>
+      </div>
+      <div id="import-status" style="font-size:11px;margin-top:6px;"></div>
+    </div>
     <div class="slot-list" id="slot-list"></div>
     <div class="slot-builder">
       <div class="builder-row">
@@ -1387,6 +1395,73 @@ function duplicatePoll(){
   window.location.href=window.location.pathname;
 }
 
+// ── Import slots from another poll ─────────────────────────────────────────
+// Converts DB time_slots rows into the create-form `slots` array shape,
+// appending (not replacing) to any existing slots.
+function addDBSlotsToBuilder(dbSlots){
+  if(!dbSlots||!dbSlots.length)return 0;
+  const singles=dbSlots.filter(s=>!s.recurrence_group);
+  const recurByGroup={};
+  dbSlots.filter(s=>s.recurrence_group).forEach(s=>{(recurByGroup[s.recurrence_group]=recurByGroup[s.recurrence_group]||[]).push(s);});
+  let added=0;
+  singles.forEach(sl=>{
+    slots.push({s:sl.start_time.slice(0,5),e:sl.end_time.slice(0,5),isRecur:false,f:sl.date,t:sl.date,days:[new Date(sl.date+'T00:00:00').getDay()]});
+    added++;
+  });
+  Object.values(recurByGroup).forEach(grpSlots=>{
+    grpSlots.sort((a,b)=>a.date.localeCompare(b.date));
+    const first=grpSlots[0];
+    const fd=new Date(first.date+'T00:00:00');
+    slots.push({s:first.start_time.slice(0,5),e:first.end_time.slice(0,5),isRecur:true,recurStart:first.date,recurDay:fd.getDay(),weeks:grpSlots.length,recurGroup:genUUID()});
+    added++;
+  });
+  if(added){
+    const firstSlot=slots[slots.length-added];
+    const fd=firstSlot.isRecur?firstSlot.recurStart:firstSlot.f;
+    const d=new Date(fd+'T00:00:00');
+    calDate=new Date(d.getFullYear(),d.getMonth(),1);
+    renderSlotList();
+    document.getElementById('cal-card').style.display='block';
+    renderCal();
+  }
+  return added;
+}
+
+// Extract a UUID from any input: raw UUID, vote URL, results URL, or ID string.
+function extractPollUUID(input){
+  if(!input)return null;
+  const m=input.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return m?m[0]:null;
+}
+
+async function importSlotsFromPoll(){
+  const input=document.getElementById('import-poll-ref').value.trim();
+  const status=document.getElementById('import-status');
+  const btn=document.getElementById('import-btn');
+  status.style.color='var(--muted)';
+  status.textContent='';
+  const uuid=extractPollUUID(input);
+  if(!uuid){status.style.color='#c0392b';status.textContent='Could not find a poll ID or token in that input.';return;}
+  btn.disabled=true;btn.textContent='Importing...';
+  try{
+    // Match either the poll id or the results_token
+    const polls=await api(`polls?or=(id.eq.${uuid},results_token.eq.${uuid})&select=id,event_name&limit=1`);
+    if(!polls||!polls.length){status.style.color='#c0392b';status.textContent='No poll found with that ID or token.';return;}
+    const poll=polls[0];
+    const dbSlots=await api(`time_slots?poll_id=eq.${poll.id}&order=date.asc,start_time.asc&select=*`);
+    if(!dbSlots||!dbSlots.length){status.style.color='#c0392b';status.textContent=`"${poll.event_name}" has no time slots to import.`;return;}
+    const added=addDBSlotsToBuilder(dbSlots);
+    status.style.color='#2d6a4f';
+    status.textContent=`Imported ${added} slot${added!==1?'s':''} from "${poll.event_name}".`;
+    document.getElementById('import-poll-ref').value='';
+  }catch(e){
+    status.style.color='#c0392b';
+    status.textContent='Error importing: '+e.message;
+  }finally{
+    btn.disabled=false;btn.textContent='Import Slots';
+  }
+}
+
 function applyDuplicateIfPresent(){
   let raw;
   try{raw=sessionStorage.getItem('duplicatePoll');}catch(e){return;}
@@ -1407,25 +1482,7 @@ function applyDuplicateIfPresent(){
       rows.appendChild(row);
     });
   }
-  // Rebuild slots array from duplicated slot rows
-  const singles=(data.slots||[]).filter(s=>!s.recurrence_group);
-  const recurByGroup={};
-  (data.slots||[]).filter(s=>s.recurrence_group).forEach(s=>{(recurByGroup[s.recurrence_group]=recurByGroup[s.recurrence_group]||[]).push(s);});
-  singles.forEach(sl=>{
-    slots.push({s:sl.start_time.slice(0,5),e:sl.end_time.slice(0,5),isRecur:false,f:sl.date,t:sl.date,days:[new Date(sl.date+'T00:00:00').getDay()]});
-  });
-  Object.values(recurByGroup).forEach(grpSlots=>{
-    grpSlots.sort((a,b)=>a.date.localeCompare(b.date));
-    const first=grpSlots[0];
-    const fd=new Date(first.date+'T00:00:00');
-    slots.push({s:first.start_time.slice(0,5),e:first.end_time.slice(0,5),isRecur:true,recurStart:first.date,recurDay:fd.getDay(),weeks:grpSlots.length,recurGroup:genUUID()});
-  });
-  if(slots.length){
-    const fd=slots[0].isRecur?slots[0].recurStart:slots[0].f;
-    const d=new Date(fd+'T00:00:00');
-    calDate=new Date(d.getFullYear(),d.getMonth(),1);
-    renderSlotList();document.getElementById('cal-card').style.display='block';renderCal();
-  }
+  addDBSlotsToBuilder(data.slots||[]);
   const note=document.createElement('div');
   note.className='success-box';
   note.innerHTML='<strong>Duplicated from existing poll.</strong> Review the details and slots, then create to save a new poll.';
