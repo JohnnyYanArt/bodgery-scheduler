@@ -253,7 +253,7 @@
       </div>
       <div style="flex:1;min-width:200px;position:relative;">
         <label>Passphrase (optional)</label>
-        <input type="text" id="ev-passphrase" placeholder="e.g. red wagon" autocomplete="off" onfocus="document.getElementById('passphrase-tip').style.display='block'" onblur="document.getElementById('passphrase-tip').style.display='none'">
+        <input type="text" id="ev-passphrase" placeholder="e.g. cheesecurds" autocomplete="off" onfocus="document.getElementById('passphrase-tip').style.display='block'" onblur="document.getElementById('passphrase-tip').style.display='none'">
         <div id="passphrase-tip" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:10;background:#fffbf2;border:1px solid var(--gold);border-radius:6px;padding:8px 10px;font-size:11px;color:#7a4f00;margin-top:2px;box-shadow:0 4px 8px rgba(0,0,0,0.08);">Pair this with your name so you can recall your poll links later from the "Recall Polls" tab. Pick a simple phrase you'll remember — <strong>do not use a real password</strong>. Leave blank if you don't want one.</div>
       </div>
     </div>
@@ -264,7 +264,11 @@
   </div>
   <div class="card">
     <div class="card-title">Conflict Checking — iCal Feeds (optional)</div>
-    <p class="hint" style="margin-bottom:10px;">Paste iCal URLs from your TeamUp calendar or the Bodgery WordPress events feed.</p>
+    <p class="hint" style="margin-bottom:10px;">Paste iCal URLs from your TeamUp calendar or the Bodgery WordPress events feed — or pick from the presets below.</p>
+    <details id="preset-feeds" style="margin-bottom:10px;border:1px solid var(--border);border-radius:6px;padding:8px 12px;background:#fafafa;">
+      <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--dark);">Bodgery Preset Feeds</summary>
+      <div id="preset-feeds-list" style="margin-top:10px;"></div>
+    </details>
     <div class="ical-rows" id="ical-rows">
       <div class="ical-row">
         <input type="url" class="ical-input" placeholder="https://teamup.com/.../ical/... or /events/feed/?ical=1">
@@ -419,7 +423,7 @@
       </div>
       <div style="flex:1;min-width:200px;">
         <label>Passphrase (leave blank if none)</label>
-        <input type="text" id="recall-passphrase" placeholder="e.g. red wagon" autocomplete="off">
+        <input type="text" id="recall-passphrase" placeholder="e.g. cheesecurds" autocomplete="off">
       </div>
     </div>
     <button class="btn btn-secondary" style="margin-top:10px;" onclick="recallPolls()">Find My Polls</button>
@@ -496,6 +500,65 @@ function copyText(text,btn){
 }
 
 // ── iCal ───────────────────────────────────────────────────────────────────
+const PRESET_FEEDS=[
+  {area:'Ceramics',label:'Classes & Events',url:'https://ics.teamup.com/feed/ksyxz3o2szi1mqsbzs/10909287.ics'},
+  {area:'Ceramics',label:'All Calendars',url:'https://ics.teamup.com/feed/ksyxz3o2szi1mqsbzs/0.ics'},
+  {area:'Ceramics',label:'3D Printer',url:'https://ics.teamup.com/feed/ksxken2s4qfd2xxn94/0.ics'},
+  {area:'3D Printing',label:'All 3D Printers',url:'https://ics.teamup.com/feed/ksjq3q8s1ueoj23suf/0.ics'},
+  {area:'CNC',label:'BigLaser',url:'https://ics.teamup.com/feed/ksxr9m5uq1bwhhwubx/6397090.ics'},
+  {area:'CNC',label:'LittleLaser',url:'https://ics.teamup.com/feed/ksxr9m5uq1bwhhwubx/6397091.ics'},
+  {area:'CNC',label:'Router',url:'https://ics.teamup.com/feed/ksxr9m5uq1bwhhwubx/10802294.ics'},
+  {area:'Woodshop',label:'Super',url:'https://ics.teamup.com/feed/ksi7xvpsjnh8v9o659/9446640.ics'},
+  {area:'Woodshop',label:'All Calendars',url:'https://ics.teamup.com/feed/ksi7xvpsjnh8v9o659/0.ics'},
+  {area:'Woodturning',label:'All Calendars',url:'https://ics.teamup.com/feed/ksbvdn6t18txk749gj/0.ics'},
+  {area:'Glass',label:'Stained Glass & Fusing',url:'https://ics.teamup.com/feed/ksd3s3yhfioj9grfw6/0.ics'},
+  {area:'Glass',label:'Flameworking & Kilns',url:'https://ics.teamup.com/feed/ksu5vksaiy8vk44eu3/0.ics'},
+  {area:'Jewelry',label:'All Calendars',url:'https://ics.teamup.com/feed/ksaas48xtc7o3dtn8m/0.ics'},
+  {area:'Metalwork',label:'Welders',url:'https://ics.teamup.com/feed/ks3movmam8d55ajur1/0.ics'},
+  {area:'Craft',label:'All Calendars',url:'https://ics.teamup.com/feed/ksbs41ohogg9hft29q/0.ics'},
+  {area:'Craft',label:'Embroidery Machine',url:'https://ics.teamup.com/feed/ksbs41ohogg9hft29q/12852179.ics'},
+  {area:'Craft',label:'Large Meeting Table',url:'https://ics.teamup.com/feed/ksbs41ohogg9hft29q/12852362.ics'},
+  {area:'Screenprinting',label:'All Calendars',url:'https://ics.teamup.com/feed/ksvnb28znojy71rzzh/0.ics'},
+  {area:'Bodgery Wide',label:'Orientations & Tours',url:'https://ics.teamup.com/feed/kskjai5sksbkxwa928/0.ics'},
+  {area:'Bodgery Wide',label:'Computer Classroom',url:'https://ics.teamup.com/feed/ksfmr2w1dztb6nv2h6/10835687.ics'},
+  {area:'Bodgery Wide',label:'Shop Classroom',url:'https://ics.teamup.com/feed/ksfmr2w1dztb6nv2h6/10835688.ics'},
+  {area:'Bodgery Wide',label:'Annex Flex Space',url:'https://ics.teamup.com/feed/ksuwe8epsmrue37247/11283862.ics'}
+];
+
+function renderPresetFeeds(){
+  const el=document.getElementById('preset-feeds-list');
+  if(!el)return;
+  const byArea={};
+  PRESET_FEEDS.forEach(f=>{(byArea[f.area]=byArea[f.area]||[]).push(f);});
+  let html='';
+  Object.entries(byArea).forEach(([area,feeds])=>{
+    html+=`<details style="margin-bottom:4px;border-left:3px solid var(--gold);padding-left:8px;"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--dark);padding:2px 0;">${area}</summary><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;margin-bottom:6px;">`;
+    feeds.forEach(f=>{
+      html+=`<button type="button" class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="addPresetFeed('${f.url}')" title="${f.url}">+ ${f.label}</button>`;
+    });
+    html+='</div></details>';
+  });
+  el.innerHTML=html;
+}
+
+function addPresetFeed(url){
+  // Check if the URL is already present in any ical-input
+  const inputs=[...document.querySelectorAll('.ical-input')];
+  if(inputs.some(i=>i.value.trim()===url)){
+    const status=document.getElementById('ical-status');
+    status.style.color='var(--muted)';
+    status.textContent='Feed already added.';
+    return;
+  }
+  // Fill the first empty input, otherwise add a new row
+  const empty=inputs.find(i=>!i.value.trim());
+  if(empty){empty.value=url;return;}
+  const rows=document.getElementById('ical-rows');
+  const div=document.createElement('div');div.className='ical-row';
+  div.innerHTML=`<input type="url" class="ical-input" value="${url}" placeholder="https://..."><button class="btn btn-ghost btn-sm" onclick="removeIcalRow(this)">Remove</button>`;
+  rows.appendChild(div);
+}
+
 function addIcalRow(){
   const rows=document.getElementById('ical-rows');
   const div=document.createElement('div');div.className='ical-row';
@@ -1577,7 +1640,7 @@ async function deleteRecalledPoll(pollId,eventName){
 const now=new Date(),pad=n=>String(n).padStart(2,'0');
 document.getElementById('b-recur-start').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
 
-window.addEventListener('DOMContentLoaded', ()=>{initFromUrl();applyDuplicateIfPresent();});
+window.addEventListener('DOMContentLoaded', ()=>{renderPresetFeeds();initFromUrl();applyDuplicateIfPresent();});
 </script>
 </body>
 </html>
