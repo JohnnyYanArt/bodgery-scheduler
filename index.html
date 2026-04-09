@@ -234,6 +234,7 @@
   <button class="nav-tab active" id="tab-create" onclick="showPage('create',this)">Create Poll</button>
   <button class="nav-tab" id="tab-vote" onclick="showPage('vote',this)">Vote on Poll</button>
   <button class="nav-tab" id="tab-results" onclick="showPage('results',this)">View Results</button>
+  <button class="nav-tab" id="tab-recall" onclick="showPage('recall',this)">Recall Polls</button>
 </div>
 
 <!-- CREATE PAGE -->
@@ -245,8 +246,17 @@
     <div class="card-title">Event Details</div>
     <label>Class / Event Name</label>
     <input type="text" id="ev-name" placeholder="e.g. Area Orientation">
-    <label>Your Name (Instructor)</label>
-    <input type="text" id="ev-instructor" placeholder="e.g. Bucky Bodger">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <label>Your Name (Instructor)</label>
+        <input type="text" id="ev-instructor" placeholder="e.g. Bucky Bodger">
+      </div>
+      <div style="flex:1;min-width:200px;position:relative;">
+        <label>Passphrase (optional)</label>
+        <input type="text" id="ev-passphrase" placeholder="e.g. red wagon" autocomplete="off" onfocus="document.getElementById('passphrase-tip').style.display='block'" onblur="document.getElementById('passphrase-tip').style.display='none'">
+        <div id="passphrase-tip" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:10;background:#fffbf2;border:1px solid var(--gold);border-radius:6px;padding:8px 10px;font-size:11px;color:#7a4f00;margin-top:2px;box-shadow:0 4px 8px rgba(0,0,0,0.08);">Pair this with your name so you can recall your poll links later from the "Recall Polls" tab. Pick a simple phrase you'll remember — <strong>do not use a real password</strong>. Leave blank if you don't want one.</div>
+      </div>
+    </div>
     <label>Description</label>
     <textarea id="ev-desc" placeholder="Description of the class, cost, prerequisites, etc."></textarea>
     <label>Voting Deadline (optional)</label>
@@ -395,6 +405,26 @@
     <p class="hint">Share this link with members so they can vote.</p>
   </div>
   <div id="res-content"></div>
+</div>
+
+<!-- RECALL PAGE -->
+<div id="page-recall" class="page">
+  <div class="section-title">Recall Your Polls</div>
+  <div class="section-sub">Enter the name and passphrase you used when creating polls to retrieve their results links.</div>
+  <div class="card">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <label>Your Name</label>
+        <input type="text" id="recall-name" placeholder="e.g. Bucky Bodger">
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <label>Passphrase (leave blank if none)</label>
+        <input type="text" id="recall-passphrase" placeholder="e.g. red wagon" autocomplete="off">
+      </div>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:10px;" onclick="recallPolls()">Find My Polls</button>
+  </div>
+  <div id="recall-content"></div>
 </div>
 
 <script>
@@ -714,6 +744,7 @@ function toggleExcludeSlot(key){
 async function createPoll(){
   const name=document.getElementById('ev-name').value.trim();
   const instructor=document.getElementById('ev-instructor').value.trim();
+  const passphrase=document.getElementById('ev-passphrase').value.trim()||null;
   const desc=document.getElementById('ev-desc').value.trim();
   const deadline=document.getElementById('ev-deadline').value||null;
   const ical_urls=[...document.querySelectorAll('.ical-input')].map(i=>i.value.trim()).filter(Boolean);
@@ -723,7 +754,7 @@ async function createPoll(){
   const btn=document.getElementById('create-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Creating...';
   try{
-    await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,description:desc,deadline,ical_urls},prefer:'return=minimal'});
+    await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,passphrase,description:desc,deadline,ical_urls},prefer:'return=minimal'});
     const pollsResult=await api(`polls?instructor_name=eq.${encodeURIComponent(instructor)}&event_name=eq.${encodeURIComponent(name)}&order=created_at.desc&limit=1&select=*`);
     const poll=pollsResult[0];
     const excludeAll=document.getElementById('exclude-all-conflicts').checked;
@@ -1496,6 +1527,50 @@ function applyDuplicateIfPresent(){
   document.getElementById('create-success').style.display='block';
   document.getElementById('create-success').innerHTML='';
   document.getElementById('create-success').appendChild(note);
+}
+
+// ── Recall polls ───────────────────────────────────────────────────────────
+async function recallPolls(){
+  const name=document.getElementById('recall-name').value.trim();
+  const passphrase=document.getElementById('recall-passphrase').value.trim();
+  const el=document.getElementById('recall-content');
+  if(!name){el.innerHTML='<div class="empty">Enter your name to search.</div>';return;}
+  el.innerHTML='<div class="empty">Searching...</div>';
+  try{
+    const passClause=passphrase?`passphrase=eq.${encodeURIComponent(passphrase)}`:'passphrase=is.null';
+    const polls=await api(`polls?instructor_name=eq.${encodeURIComponent(name)}&${passClause}&order=created_at.desc&select=id,event_name,created_at,results_token`);
+    if(!polls||!polls.length){el.innerHTML='<div class="empty">No polls found for that name and passphrase.</div>';return;}
+    renderRecallResults(polls);
+  }catch(e){el.innerHTML='<div class="empty">Error searching: '+e.message+'</div>';}
+}
+
+function renderRecallResults(polls){
+  const el=document.getElementById('recall-content');
+  const base=window.location.origin+window.location.pathname;
+  let html='<div class="card"><div class="card-title">Found '+polls.length+' poll'+(polls.length!==1?'s':'')+'</div>';
+  polls.forEach(p=>{
+    const url=`${base}?results=${p.results_token}`;
+    const created=fmtDateUS(p.created_at.slice(0,10));
+    html+=`<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+        <div><div style="font-weight:700;font-size:14px;">${p.event_name}</div><div style="font-size:11px;color:var(--muted);">Created ${created}</div></div>
+        <button class="btn btn-danger btn-sm" onclick="deleteRecalledPoll('${p.id}','${p.event_name.replace(/'/g,"\\'")}')">Delete</button>
+      </div>
+      <div class="link-box"><span>${url}</span><button class="copy-btn" onclick="copyText('${url}',this)">Copy</button><button class="open-btn" onclick="window.open('${url}','_blank')">Open</button></div>
+    </div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+async function deleteRecalledPoll(pollId,eventName){
+  if(!confirm(`Permanently delete "${eventName}" and all its votes? This cannot be undone.`))return;
+  try{
+    await api(`votes?poll_id=eq.${pollId}`,{method:'DELETE',prefer:'return=minimal'});
+    await api(`time_slots?poll_id=eq.${pollId}`,{method:'DELETE',prefer:'return=minimal'});
+    await api(`polls?id=eq.${pollId}`,{method:'DELETE',prefer:'return=minimal'});
+    recallPolls();
+  }catch(e){alert('Error deleting poll: '+e.message);}
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
