@@ -886,10 +886,11 @@ async function loadVote(){
 }
 
 // ── Vote calendar state ────────────────────────────────────────────────────
-let vCalDate=new Date(), vCalItems=[], vCalPollId='', vCalHasRecur=false;
+let vCalDate=new Date(), vCalItems=[], vCalPollId='', vCalHasRecur=false, vCalNavUsed=false;
 
 function renderVote(poll,slts,el){
   voteSelected=new Set();
+  vCalNavUsed=false;
   const items=groupSlotsByRecurrence(slts);
   vCalItems=items;
   vCalPollId=poll.id;
@@ -907,14 +908,18 @@ function renderVote(poll,slts,el){
     </div>
     ${poll.description?`<p style="margin-top:10px;font-size:14px;">${poll.description}</p>`:''}
   </div>
+  <div style="background:#fffbf2;border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#7a4f00;line-height:1.5;">
+    <strong>How this works:</strong> This tool helps instructors find times that work for the most members. Voting does not guarantee a class will be scheduled. For the best chance of a class being listed, <strong>select every time that works for you</strong> — not just your top choice. Once a class is officially listed, sign up through the <a href="https://mms.thebodgery.org/events/" target="_blank" style="color:var(--orange);font-weight:700;">Bodgery Events page</a>.
+  </div>
   <div class="card"><div class="card-title">Your Name</div><input type="text" id="voter-name" placeholder="First and last name"></div>
   <div class="card">
     <div class="card-title">Select All Times That Work For You</div>
     ${vCalHasRecur?`<div class="commitment-note" style="margin-bottom:12px;">Options marked with ↻ are recurring series. A vote means you can commit to <strong>all sessions</strong> in that series.</div>`:''}
     <div class="cal-nav" style="margin-bottom:10px;">
-      <button class="btn btn-ghost btn-sm" onclick="vCalNav(-1)">&#8592;</button>
+      <button class="btn btn-ghost btn-sm" id="vcal-prev" onclick="vCalNav(-1)">&#8592;</button>
       <span class="cal-title" id="vcal-title"></span>
-      <button class="btn btn-ghost btn-sm" onclick="vCalNav(1)">&#8594;</button>
+      <span id="vcal-nav-hint" style="display:none;font-size:11px;color:var(--orange);font-weight:700;white-space:nowrap;">More times available &#8594;</span>
+      <button class="btn btn-ghost btn-sm" id="vcal-next" onclick="vCalNav(1)">&#8594;</button>
     </div>
     <div id="vcal-body"></div>
     <p style="font-size:11px;color:var(--muted);margin-top:8px;">Click a time slot on the calendar to toggle your availability. Selected slots turn gold.</p>
@@ -928,6 +933,7 @@ function renderVote(poll,slts,el){
 }
 
 function vCalNav(dir){
+  vCalNavUsed=true;
   vCalDate.setMonth(vCalDate.getMonth()+dir);
   renderVCal();
   document.getElementById('vcal-day-panel').innerHTML='';
@@ -986,6 +992,33 @@ function renderVCal(){
   }
   html+='</tbody></table>';
   body.innerHTML=html;
+
+  // Determine which months have slots
+  const allDates=[];
+  vCalItems.forEach(item=>{
+    if(item.type==='recur') item.slots.forEach(s=>allDates.push(s.date));
+    else allDates.push(item.slot.date);
+  });
+  const hasPrev=allDates.some(d=>{const dt=new Date(d+'T00:00:00');return dt.getFullYear()<yr||(dt.getFullYear()===yr&&dt.getMonth()<mo);});
+  const hasNext=allDates.some(d=>{const dt=new Date(d+'T00:00:00');return dt.getFullYear()>yr||(dt.getFullYear()===yr&&dt.getMonth()>mo);});
+  const prevBtn=document.getElementById('vcal-prev');
+  const nextBtn=document.getElementById('vcal-next');
+  if(prevBtn){
+    prevBtn.style.background=hasPrev?'var(--orange)':'';
+    prevBtn.style.color=hasPrev?'#fff':'';
+    prevBtn.style.borderColor=hasPrev?'var(--orange)':'';
+  }
+  if(nextBtn){
+    nextBtn.style.background=hasNext?'var(--orange)':'';
+    nextBtn.style.color=hasNext?'#fff':'';
+    nextBtn.style.borderColor=hasNext?'var(--orange)':'';
+  }
+  // One-time hint when poll first loads and there are slots in other months
+  const hint=document.getElementById('vcal-nav-hint');
+  if(hint){
+    if(!vCalNavUsed&&(hasPrev||hasNext)){hint.style.display='inline';hint.textContent=hasPrev&&hasNext?'← More times available →':hasNext?'More times available →':'← More times available';}
+    else{hint.style.display='none';}
+  }
 }
 
 function vCalToggleItem(id){
