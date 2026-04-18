@@ -1004,15 +1004,15 @@ async function loadVote(){
       let html=`<div class="card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
           <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+fmtDateUS(poll.deadline):''}</div></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Instructor: ${poll.instructor_name}${poll.deadline?' · Voting Deadline: '+fmtDateUS(poll.deadline):''}</div>
+          ${(poll.cost||poll.min_attendees||poll.prerequisites)?`<div style="font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 16px;">
+            ${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}
+            ${poll.min_attendees?`<span><strong>Attendees:</strong> ${poll.min_attendees}</span>`:''}
+            ${poll.prerequisites?`<span><strong>Prerequisites:</strong> ${poll.prerequisites}</span>`:''}
+          </div>`:''}</div>
           <span class="badge badge-closed">Closed</span>
         </div>
         ${poll.description?`<p style="margin-top:10px;font-size:14px;">${poll.description}</p>`:''}
-        ${(poll.cost||poll.min_attendees||poll.prerequisites)?`<div style="margin-top:10px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 16px;">
-          ${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}
-          ${poll.min_attendees?`<span><strong>Attendees:</strong> ${poll.min_attendees}</span>`:''}
-          ${poll.prerequisites?`<span><strong>Prereqs:</strong> ${poll.prerequisites}</span>`:''}
-        </div>`:''}
       </div>
       <div style="background:#fde8e4;border:1px solid var(--orange);border-radius:8px;padding:10px 14px;font-size:13px;color:#7a2e1a;line-height:1.5;">
         <strong>${isPastDeadline?'Voting deadline passed.':'This poll has been closed.'}</strong>
@@ -1058,15 +1058,15 @@ function renderVote(poll,slts,el,votes){
   let html=`<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
       <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:2px;">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+fmtDateUS(poll.deadline):''}</div></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">Instructor: ${poll.instructor_name}${poll.deadline?' · Voting Deadline: '+fmtDateUS(poll.deadline):''}</div>
+      ${(poll.cost||poll.min_attendees||poll.prerequisites)?`<div style="font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 16px;">
+        ${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}
+        ${poll.min_attendees?`<span><strong>Attendees:</strong> ${poll.min_attendees}</span>`:''}
+        ${poll.prerequisites?`<span><strong>Prerequisites:</strong> ${poll.prerequisites}</span>`:''}
+      </div>`:''}</div>
       <span class="badge badge-open">Open</span>
     </div>
     ${poll.description?`<p style="margin-top:10px;font-size:14px;">${poll.description}</p>`:''}
-    ${(poll.cost||poll.min_attendees||poll.prerequisites)?`<div style="margin-top:10px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 16px;">
-      ${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}
-      ${poll.min_attendees?`<span><strong>Attendees:</strong> ${poll.min_attendees}</span>`:''}
-      ${poll.prerequisites?`<span><strong>Prereqs:</strong> ${poll.prerequisites}</span>`:''}
-    </div>`:''}
   </div>
   <div style="background:#fffbf2;border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#7a4f00;line-height:1.5;">
     <strong>How this works:</strong> This tool helps instructors find times that work for the most members. Voting does not guarantee a class will be scheduled. For the best chance of a class being listed, <strong>select every time that works for you</strong> — not just your top choice. If you've already voted and want to change your selections, submit again with the same name — your previous response will be replaced. Once a class is officially listed, sign up through the <a href="https://mms.thebodgery.org/events/" target="_blank" style="color:var(--orange);font-weight:700;">Bodgery Events page</a>.
