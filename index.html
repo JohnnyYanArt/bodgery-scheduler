@@ -235,6 +235,7 @@
 <div class="nav-tabs">
   <button class="nav-tab active" id="tab-create" onclick="showPage('create',this)">Create Poll</button>
   <button class="nav-tab" id="tab-vote" onclick="showPage('vote',this)">Vote on Poll</button>
+  <button class="nav-tab" id="tab-browse" onclick="showPage('browse',this)">Browse Polls</button>
   <button class="nav-tab" id="tab-results" onclick="showPage('results',this)">View Results</button>
   <button class="nav-tab" id="tab-recall" onclick="showPage('recall',this)">Recall Polls</button>
 </div>
@@ -262,19 +263,15 @@
     <div style="display:flex;gap:12px;flex-wrap:wrap;">
       <div style="flex:1;min-width:120px;">
         <label>Cost (optional)</label>
-        <input type="text" id="ev-cost" placeholder="e.g. $25 materials fee">
+        <input type="text" id="ev-cost" placeholder="e.g. $40">
       </div>
-      <div style="flex:1;min-width:120px;">
-        <label>Min Attendees (optional)</label>
-        <input type="text" id="ev-min" placeholder="e.g. 3">
-      </div>
-      <div style="flex:1;min-width:120px;">
-        <label>Max Attendees (optional)</label>
-        <input type="text" id="ev-max" placeholder="e.g. 10">
+      <div style="flex:1;min-width:160px;">
+        <label>Min/Max Attendees (optional)</label>
+        <input type="text" id="ev-attendees" placeholder="e.g. 1-5">
       </div>
     </div>
     <label>Prerequisites (optional)</label>
-    <input type="text" id="ev-prereqs" placeholder="e.g. Must have completed shop orientation">
+    <input type="text" id="ev-prereqs" placeholder="e.g. Must have completed area orientation">
     <label>Description</label>
     <textarea id="ev-desc" placeholder="Any additional details about the class or event."></textarea>
     <label>Voting Deadline (optional)</label>
@@ -428,8 +425,14 @@
       <button class="btn btn-secondary" onclick="loadVote()">Load Poll</button>
     </div>
   </div>
-  <div class="card" id="public-polls-card">
-    <div class="card-title">Browse Public Polls</div>
+  <div id="vote-content"></div>
+</div>
+
+<!-- BROWSE PAGE -->
+<div id="page-browse" class="page">
+  <div class="section-title">Browse Public Polls</div>
+  <div class="section-sub">Find open polls from instructors across all areas.</div>
+  <div class="card">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
       <label style="font-size:12px;margin:0;white-space:nowrap;">Filter by category:</label>
       <select id="public-category-filter" style="flex:1;min-width:140px;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;" onchange="renderPublicPolls()">
@@ -438,7 +441,6 @@
     </div>
     <div id="public-polls-list"><div class="empty">Loading...</div></div>
   </div>
-  <div id="vote-content"></div>
 </div>
 
 <!-- RESULTS PAGE -->
@@ -517,7 +519,7 @@ function initFromUrl(){
     document.getElementById('res-token').value=resultsToken;
     loadResults();
   } else if(category){
-    showPage('vote',document.getElementById('tab-vote'));
+    showPage('browse',document.getElementById('tab-browse'));
   }
   loadPublicPolls();
 }
@@ -862,8 +864,7 @@ async function createPoll(){
   const instructor=document.getElementById('ev-instructor').value.trim();
   const passphrase=document.getElementById('ev-passphrase').value.trim()||null;
   const cost=document.getElementById('ev-cost').value.trim()||null;
-  const min_attendees=document.getElementById('ev-min').value.trim()||null;
-  const max_attendees=document.getElementById('ev-max').value.trim()||null;
+  const min_attendees=document.getElementById('ev-attendees').value.trim()||null;
   const prerequisites=document.getElementById('ev-prereqs').value.trim()||null;
   const desc=document.getElementById('ev-desc').value.trim();
   const deadline=document.getElementById('ev-deadline').value||null;
@@ -877,7 +878,7 @@ async function createPoll(){
   const btn=document.getElementById('create-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Creating...';
   try{
-    await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,passphrase,description:desc,deadline,ical_urls,cost,min_attendees,max_attendees,prerequisites,is_public,category,hide_results},prefer:'return=minimal'});
+    await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,passphrase,description:desc,deadline,ical_urls,cost,min_attendees,prerequisites,is_public,category,hide_results},prefer:'return=minimal'});
     const pollsResult=await api(`polls?instructor_name=eq.${encodeURIComponent(instructor)}&event_name=eq.${encodeURIComponent(name)}&order=created_at.desc&limit=1&select=*`);
     const poll=pollsResult[0];
     const excludeAll=document.getElementById('exclude-all-conflicts').checked;
@@ -958,7 +959,7 @@ function renderPublicPolls(){
     const url=`${base}?vote=${p.id}`;
     const details=[];
     if(p.cost)details.push(`Cost: ${p.cost}`);
-    if(p.min_attendees||p.max_attendees)details.push(`Attendees: ${p.min_attendees||'—'}–${p.max_attendees||'—'}`);
+    if(p.min_attendees)details.push(`Attendees: ${p.min_attendees}`);
     if(p.deadline)details.push(`Deadline: ${fmtDateUS(p.deadline)}`);
     html+=`<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
@@ -968,7 +969,7 @@ function renderPublicPolls(){
           ${p.description?`<div style="font-size:12px;color:var(--text);margin-top:4px;">${p.description}</div>`:''}
           ${p.prerequisites?`<div style="font-size:11px;color:#7a4f00;margin-top:2px;">Prerequisites: ${p.prerequisites}</div>`:''}
         </div>
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('vote-id').value='${p.id}';loadVote();">Vote</button>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('vote-id').value='${p.id}';showPage('vote',document.getElementById('tab-vote'));loadVote();">Vote</button>
       </div>
     </div>`;
   });
@@ -1029,10 +1030,9 @@ function renderVote(poll,slts,el,votes){
       <span class="badge badge-open">Open</span>
     </div>
     ${poll.description?`<p style="margin-top:10px;font-size:14px;">${poll.description}</p>`:''}
-    ${(poll.cost||poll.min_attendees||poll.max_attendees||poll.prerequisites)?`<div style="margin-top:10px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 16px;">
+    ${(poll.cost||poll.min_attendees||poll.prerequisites)?`<div style="margin-top:10px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 16px;">
       ${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}
-      ${poll.min_attendees?`<span><strong>Min:</strong> ${poll.min_attendees}</span>`:''}
-      ${poll.max_attendees?`<span><strong>Max:</strong> ${poll.max_attendees}</span>`:''}
+      ${poll.min_attendees?`<span><strong>Attendees:</strong> ${poll.min_attendees}</span>`:''}
       ${poll.prerequisites?`<span><strong>Prereqs:</strong> ${poll.prerequisites}</span>`:''}
     </div>`:''}
   </div>
@@ -1104,7 +1104,8 @@ function renderVCal(){
     html+=`<div class="${cls}"><div class="vcal-day-num">${cur.getDate()}</div>`;
     dayItems.forEach(item=>{
       const isSel=voteSelected.has(item.id);
-      const cnt=vCalShowCounts&&vCalCounts[item.id]?` · ${vCalCounts[item.id]}`:'';
+      const vc=vCalCounts[item.id]||0;
+      const cnt=vCalShowCounts&&vc?` (${vc} Vote${vc!==1?'s':''})`:'';
       if(item.type==='recur'){
         const first=item.slots[0];
         const cls2=isSel?'vcal-pill vp-recur-selected':'vcal-pill vp-recur';
@@ -1171,7 +1172,8 @@ function vCalDayClick(ds){
     </div>`;
   dayItems.forEach(item=>{
     const isSel=voteSelected.has(item.id);
-    const cnt=vCalShowCounts&&vCalCounts[item.id]?` · ${vCalCounts[item.id]} vote${vCalCounts[item.id]!==1?'s':''}`:'';
+    const vc2=vCalCounts[item.id]||0;
+    const cnt=vCalShowCounts&&vc2?` (${vc2} Vote${vc2!==1?'s':''})`:'';
     if(item.type==='recur'){
       const first=item.slots[0],last=item.slots[item.slots.length-1];
       const ld=new Date(last.date+'T00:00:00');
@@ -1306,7 +1308,7 @@ function renderResults(poll,slts,votes,el){
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
       <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
       <div style="font-size:12px;color:var(--muted);">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+fmtDateUS(poll.deadline):''}${poll.category?` · Category: ${poll.category}`:''}</div>
-      ${(poll.cost||poll.min_attendees||poll.max_attendees||poll.prerequisites)?`<div style="font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px;">${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}${poll.min_attendees?`<span><strong>Min:</strong> ${poll.min_attendees}</span>`:''}${poll.max_attendees?`<span><strong>Max:</strong> ${poll.max_attendees}</span>`:''}${poll.prerequisites?`<span><strong>Prereqs:</strong> ${poll.prerequisites}</span>`:''}</div>`:''}
+      ${(poll.cost||poll.min_attendees||poll.prerequisites)?`<div style="font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px;">${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}${poll.min_attendees?`<span><strong>Attendees:</strong> ${poll.min_attendees}</span>`:''}${poll.prerequisites?`<span><strong>Prereqs:</strong> ${poll.prerequisites}</span>`:''}</div>`:''}
       ${poll.description?`<div style="font-size:12px;color:var(--muted);margin-top:4px;">${poll.description}</div>`:''}</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <span class="badge ${poll.is_closed?'badge-closed':'badge-open'}">${poll.is_closed?'Closed':'Open'}</span>
@@ -1507,8 +1509,7 @@ function captureEditFormState(){
     desc:document.getElementById('edit-desc').value,
     deadline:document.getElementById('edit-deadline').value,
     cost:document.getElementById('edit-cost').value,
-    min_attendees:document.getElementById('edit-min').value,
-    max_attendees:document.getElementById('edit-max').value,
+    min_attendees:document.getElementById('edit-attendees').value,
     prerequisites:document.getElementById('edit-prereqs').value,
     is_public:document.getElementById('edit-public').checked,
     category:document.getElementById('edit-category').value,
@@ -1532,7 +1533,7 @@ function renderEditPanel(){
   const p=currentResultsPoll;if(!p)return;
   const panel=document.getElementById('edit-poll-panel');
   if(!panel)return;
-  const fs=editFormState||{name:p.event_name||'',instructor:p.instructor_name||'',desc:p.description||'',deadline:p.deadline||'',cost:p.cost||'',min_attendees:p.min_attendees||'',max_attendees:p.max_attendees||'',prerequisites:p.prerequisites||'',is_public:!!p.is_public,category:p.category||'',hide_results:!!p.hide_results};
+  const fs=editFormState||{name:p.event_name||'',instructor:p.instructor_name||'',desc:p.description||'',deadline:p.deadline||'',cost:p.cost||'',min_attendees:p.min_attendees||'',prerequisites:p.prerequisites||'',is_public:!!p.is_public,category:p.category||'',hide_results:!!p.hide_results};
   const singles=currentResultsSlots.filter(s=>!s.recurrence_group);
   const recurGroups={};
   currentResultsSlots.filter(s=>s.recurrence_group).forEach(s=>{(recurGroups[s.recurrence_group]=recurGroups[s.recurrence_group]||[]).push(s);});
@@ -1567,8 +1568,7 @@ function renderEditPanel(){
       <input type="text" id="edit-instructor" value="${fs.instructor.replace(/"/g,'&quot;')}">
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <div style="flex:1;min-width:120px;"><label>Cost</label><input type="text" id="edit-cost" value="${(fs.cost||'').replace(/"/g,'&quot;')}"></div>
-        <div style="flex:1;min-width:120px;"><label>Min Attendees</label><input type="text" id="edit-min" value="${(fs.min_attendees||'').replace(/"/g,'&quot;')}"></div>
-        <div style="flex:1;min-width:120px;"><label>Max Attendees</label><input type="text" id="edit-max" value="${(fs.max_attendees||'').replace(/"/g,'&quot;')}"></div>
+        <div style="flex:1;min-width:160px;"><label>Min/Max Attendees</label><input type="text" id="edit-attendees" value="${(fs.min_attendees||'').replace(/"/g,'&quot;')}"></div>
       </div>
       <label>Prerequisites</label>
       <input type="text" id="edit-prereqs" value="${(fs.prerequisites||'').replace(/"/g,'&quot;')}">
@@ -1659,8 +1659,7 @@ async function saveEditPoll(){
     description:document.getElementById('edit-desc').value.trim(),
     deadline:document.getElementById('edit-deadline').value||null,
     cost:document.getElementById('edit-cost').value.trim()||null,
-    min_attendees:document.getElementById('edit-min').value.trim()||null,
-    max_attendees:document.getElementById('edit-max').value.trim()||null,
+    min_attendees:document.getElementById('edit-attendees').value.trim()||null,
     prerequisites:document.getElementById('edit-prereqs').value.trim()||null,
     is_public:isPublic,
     category:isPublic?(document.getElementById('edit-category').value.trim()||null):null,
@@ -1697,7 +1696,6 @@ function duplicatePoll(){
     deadline:p.deadline||'',
     cost:p.cost||'',
     min_attendees:p.min_attendees||'',
-    max_attendees:p.max_attendees||'',
     prerequisites:p.prerequisites||'',
     ical_urls:p.ical_urls||[],
     slots:currentResultsSlots.map(s=>({date:s.date,start_time:s.start_time,end_time:s.end_time,recurrence_group:s.recurrence_group,recurrence_weeks:s.recurrence_weeks}))
@@ -1782,8 +1780,7 @@ function applyDuplicateIfPresent(){
   document.getElementById('ev-name').value=data.event_name||'';
   document.getElementById('ev-instructor').value=data.instructor_name||'';
   document.getElementById('ev-cost').value=data.cost||'';
-  document.getElementById('ev-min').value=data.min_attendees||'';
-  document.getElementById('ev-max').value=data.max_attendees||'';
+  document.getElementById('ev-attendees').value=data.min_attendees||'';
   document.getElementById('ev-prereqs').value=data.prerequisites||'';
   document.getElementById('ev-desc').value=data.description||'';
   document.getElementById('ev-deadline').value=data.deadline||'';
