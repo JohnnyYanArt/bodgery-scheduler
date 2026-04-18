@@ -259,10 +259,47 @@
         <div id="passphrase-tip" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:10;background:#fffbf2;border:1px solid var(--gold);border-radius:6px;padding:8px 10px;font-size:11px;color:#7a4f00;margin-top:2px;box-shadow:0 4px 8px rgba(0,0,0,0.08);">Pair this with your name so you can recall your poll links later from the "Recall Polls" tab. Pick a simple phrase you'll remember — <strong>do not use a real password</strong>. Leave blank if you don't want one.</div>
       </div>
     </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:120px;">
+        <label>Cost (optional)</label>
+        <input type="text" id="ev-cost" placeholder="e.g. $25 materials fee">
+      </div>
+      <div style="flex:1;min-width:120px;">
+        <label>Min Attendees (optional)</label>
+        <input type="text" id="ev-min" placeholder="e.g. 3">
+      </div>
+      <div style="flex:1;min-width:120px;">
+        <label>Max Attendees (optional)</label>
+        <input type="text" id="ev-max" placeholder="e.g. 10">
+      </div>
+    </div>
+    <label>Prerequisites (optional)</label>
+    <input type="text" id="ev-prereqs" placeholder="e.g. Must have completed shop orientation">
     <label>Description</label>
-    <textarea id="ev-desc" placeholder="Description of the class, cost, prerequisites, etc."></textarea>
+    <textarea id="ev-desc" placeholder="Any additional details about the class or event."></textarea>
     <label>Voting Deadline (optional)</label>
     <input type="date" id="ev-deadline">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+      <div style="position:relative;">
+        <label style="display:flex;align-items:center;gap:8px;margin:0;font-size:13px;cursor:pointer;">
+          <input type="checkbox" id="ev-public" style="width:auto;accent-color:var(--orange);" onchange="document.getElementById('ev-category-wrap').style.display=this.checked?'block':'none'" onfocus="document.getElementById('public-tip').style.display='block'" onblur="document.getElementById('public-tip').style.display='none'">
+          Public poll
+        </label>
+        <div id="public-tip" style="display:none;position:absolute;top:100%;left:0;z-index:10;width:260px;background:#fffbf2;border:1px solid var(--gold);border-radius:6px;padding:8px 10px;font-size:11px;color:#7a4f00;margin-top:2px;box-shadow:0 4px 8px rgba(0,0,0,0.08);">Makes this poll visible on the "Vote on Poll" page so members can find it without needing a direct link.</div>
+      </div>
+      <div style="position:relative;">
+        <label style="display:flex;align-items:center;gap:8px;margin:0;font-size:13px;cursor:pointer;">
+          <input type="checkbox" id="ev-hide-results" style="width:auto;accent-color:var(--orange);" onfocus="document.getElementById('hideresults-tip').style.display='block'" onblur="document.getElementById('hideresults-tip').style.display='none'">
+          Hide results from voters
+        </label>
+        <div id="hideresults-tip" style="display:none;position:absolute;top:100%;left:0;z-index:10;width:260px;background:#fffbf2;border:1px solid var(--gold);border-radius:6px;padding:8px 10px;font-size:11px;color:#7a4f00;margin-top:2px;box-shadow:0 4px 8px rgba(0,0,0,0.08);">When unchecked, voters will see vote counts (but not names) on the voting page. Check this to keep all results private until you're ready to share them.</div>
+      </div>
+    </div>
+    <div id="ev-category-wrap" style="display:none;margin-top:10px;position:relative;">
+      <label>Category (optional)</label>
+      <input type="text" id="ev-category" placeholder="e.g. Woodshop, Ceramics, Orientation" onfocus="document.getElementById('category-tip').style.display='block'" onblur="document.getElementById('category-tip').style.display='none'">
+      <div id="category-tip" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:10;background:#fffbf2;border:1px solid var(--gold);border-radius:6px;padding:8px 10px;font-size:11px;color:#7a4f00;margin-top:2px;box-shadow:0 4px 8px rgba(0,0,0,0.08);">Adds a label for filtering. Members browsing public polls can filter by category. A shareable link can also be generated to show only polls in a specific category.</div>
+    </div>
   </div>
   <div class="card">
     <div class="card-title">Conflict Checking — iCal Feeds (optional)</div>
@@ -385,11 +422,21 @@
   <div class="section-title">Vote on a Poll</div>
   <div class="section-sub">Select every time option that works for you.</div>
   <div id="vote-id-card" class="card">
-    <label>Poll ID</label>
+    <label>Poll ID or Link</label>
     <div style="display:flex;gap:8px;">
-      <input type="text" id="vote-id" placeholder="Paste poll ID here..." style="flex:1;font-family:monospace;font-size:12px;">
+      <input type="text" id="vote-id" placeholder="Paste poll ID or voting link here..." style="flex:1;font-family:monospace;font-size:12px;">
       <button class="btn btn-secondary" onclick="loadVote()">Load Poll</button>
     </div>
+  </div>
+  <div class="card" id="public-polls-card">
+    <div class="card-title">Browse Public Polls</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+      <label style="font-size:12px;margin:0;white-space:nowrap;">Filter by category:</label>
+      <select id="public-category-filter" style="flex:1;min-width:140px;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;" onchange="renderPublicPolls()">
+        <option value="">All categories</option>
+      </select>
+    </div>
+    <div id="public-polls-list"><div class="empty">Loading...</div></div>
   </div>
   <div id="vote-content"></div>
 </div>
@@ -460,6 +507,7 @@ function initFromUrl(){
   const p=getParams();
   const voteId=p.get('vote');
   const resultsToken=p.get('results');
+  const category=p.get('category');
   if(voteId){
     showPage('vote',document.getElementById('tab-vote'));
     document.getElementById('vote-id').value=voteId;
@@ -468,7 +516,10 @@ function initFromUrl(){
     showPage('results',document.getElementById('tab-results'));
     document.getElementById('res-token').value=resultsToken;
     loadResults();
+  } else if(category){
+    showPage('vote',document.getElementById('tab-vote'));
   }
+  loadPublicPolls();
 }
 
 // ── Supabase helper ────────────────────────────────────────────────────────
@@ -810,8 +861,15 @@ async function createPoll(){
   const name=document.getElementById('ev-name').value.trim();
   const instructor=document.getElementById('ev-instructor').value.trim();
   const passphrase=document.getElementById('ev-passphrase').value.trim()||null;
+  const cost=document.getElementById('ev-cost').value.trim()||null;
+  const min_attendees=document.getElementById('ev-min').value.trim()||null;
+  const max_attendees=document.getElementById('ev-max').value.trim()||null;
+  const prerequisites=document.getElementById('ev-prereqs').value.trim()||null;
   const desc=document.getElementById('ev-desc').value.trim();
   const deadline=document.getElementById('ev-deadline').value||null;
+  const is_public=document.getElementById('ev-public').checked;
+  const category=is_public?(document.getElementById('ev-category').value.trim()||null):null;
+  const hide_results=document.getElementById('ev-hide-results').checked;
   const ical_urls=[...document.querySelectorAll('.ical-input')].map(i=>i.value.trim()).filter(Boolean);
   if(!name){alert('Enter an event name.');return;}
   if(!instructor){alert('Enter your name.');return;}
@@ -819,7 +877,7 @@ async function createPoll(){
   const btn=document.getElementById('create-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Creating...';
   try{
-    await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,passphrase,description:desc,deadline,ical_urls},prefer:'return=minimal'});
+    await api('polls',{method:'POST',body:{event_name:name,instructor_name:instructor,passphrase,description:desc,deadline,ical_urls,cost,min_attendees,max_attendees,prerequisites,is_public,category,hide_results},prefer:'return=minimal'});
     const pollsResult=await api(`polls?instructor_name=eq.${encodeURIComponent(instructor)}&event_name=eq.${encodeURIComponent(name)}&order=created_at.desc&limit=1&select=*`);
     const poll=pollsResult[0];
     const excludeAll=document.getElementById('exclude-all-conflicts').checked;
@@ -869,8 +927,57 @@ function groupSlotsByRecurrence(slts){
   return items;
 }
 
+let publicPollsData=[];
+
+async function loadPublicPolls(){
+  try{
+    const polls=await api(`polls?is_public=eq.true&is_closed=eq.false&order=created_at.desc&select=id,event_name,instructor_name,category,deadline,description,cost,min_attendees,max_attendees,prerequisites,created_at`);
+    publicPollsData=polls||[];
+    // Populate category filter
+    const filter=document.getElementById('public-category-filter');
+    const cats=[...new Set(publicPollsData.map(p=>p.category).filter(Boolean))].sort();
+    const currentVal=filter.value;
+    filter.innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option value="${c}"${c===currentVal?' selected':''}>${c}</option>`).join('');
+    // Check for URL category param
+    const urlCat=getParams().get('category');
+    if(urlCat&&cats.includes(urlCat)){filter.value=urlCat;}
+    renderPublicPolls();
+  }catch(e){
+    document.getElementById('public-polls-list').innerHTML='<div class="empty">Could not load public polls.</div>';
+  }
+}
+
+function renderPublicPolls(){
+  const el=document.getElementById('public-polls-list');
+  const cat=document.getElementById('public-category-filter').value;
+  const filtered=cat?publicPollsData.filter(p=>p.category===cat):publicPollsData;
+  if(!filtered.length){el.innerHTML='<div class="empty">No public polls found'+(cat?' in this category':'')+'. Check back later or use a direct link above.</div>';return;}
+  const base=window.location.origin+window.location.pathname;
+  let html='';
+  filtered.forEach(p=>{
+    const url=`${base}?vote=${p.id}`;
+    const details=[];
+    if(p.cost)details.push(`Cost: ${p.cost}`);
+    if(p.min_attendees||p.max_attendees)details.push(`Attendees: ${p.min_attendees||'—'}–${p.max_attendees||'—'}`);
+    if(p.deadline)details.push(`Deadline: ${fmtDateUS(p.deadline)}`);
+    html+=`<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:14px;">${p.event_name}${p.category?` <span style="font-size:10px;background:var(--gold);color:var(--dark);padding:1px 6px;border-radius:10px;font-weight:700;vertical-align:middle;">${p.category}</span>`:''}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">by ${p.instructor_name}${details.length?' · '+details.join(' · '):''}</div>
+          ${p.description?`<div style="font-size:12px;color:var(--text);margin-top:4px;">${p.description}</div>`:''}
+          ${p.prerequisites?`<div style="font-size:11px;color:#7a4f00;margin-top:2px;">Prerequisites: ${p.prerequisites}</div>`:''}
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('vote-id').value='${p.id}';loadVote();">Vote</button>
+      </div>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
 async function loadVote(){
-  const id=document.getElementById('vote-id').value.trim();
+  const raw=document.getElementById('vote-id').value.trim();
+  const id=extractPollUUID(raw)||raw;
   const el=document.getElementById('vote-content');
   if(!id)return;
   el.innerHTML='<div class="empty">Loading...</div>';
@@ -881,20 +988,35 @@ async function loadVote(){
     const poll=polls[0];
     if(poll.is_closed){el.innerHTML='<div class="empty">This poll is closed.</div>';return;}
     const slts=await api(`time_slots?poll_id=eq.${id}&order=date.asc,start_time.asc&select=*`);
-    renderVote(poll,slts,el);
+    let votes=[];
+    if(!poll.hide_results){votes=await api(`votes?poll_id=eq.${id}&select=slot_ids`);}
+    renderVote(poll,slts,el,votes);
   }catch(e){el.innerHTML='<div class="empty">Error loading poll. Please try again.</div>';}
 }
 
 // ── Vote calendar state ────────────────────────────────────────────────────
 let vCalDate=new Date(), vCalItems=[], vCalPollId='', vCalHasRecur=false, vCalNavUsed=false;
+let vCalCounts={}, vCalShowCounts=false;
 
-function renderVote(poll,slts,el){
+function renderVote(poll,slts,el,votes){
   voteSelected=new Set();
   vCalNavUsed=false;
   const items=groupSlotsByRecurrence(slts);
   vCalItems=items;
   vCalPollId=poll.id;
   vCalHasRecur=items.some(i=>i.type==='recur');
+  vCalShowCounts=!poll.hide_results;
+  vCalCounts={};
+  items.forEach(item=>{vCalCounts[item.id]=0;});
+  if(votes&&votes.length){
+    votes.forEach(v=>{
+      const vSlots=new Set(v.slot_ids||[]);
+      items.forEach(item=>{
+        const ids=item.type==='recur'?item.slots.map(s=>s.id):[item.slot.id];
+        if(ids.some(sid=>vSlots.has(sid)))vCalCounts[item.id]++;
+      });
+    });
+  }
 
   // Default to first slot's month
   const firstDate=items.length?(items[0].type==='recur'?items[0].slots[0].date:items[0].slot.date):null;
@@ -907,9 +1029,15 @@ function renderVote(poll,slts,el){
       <span class="badge badge-open">Open</span>
     </div>
     ${poll.description?`<p style="margin-top:10px;font-size:14px;">${poll.description}</p>`:''}
+    ${(poll.cost||poll.min_attendees||poll.max_attendees||poll.prerequisites)?`<div style="margin-top:10px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 16px;">
+      ${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}
+      ${poll.min_attendees?`<span><strong>Min:</strong> ${poll.min_attendees}</span>`:''}
+      ${poll.max_attendees?`<span><strong>Max:</strong> ${poll.max_attendees}</span>`:''}
+      ${poll.prerequisites?`<span><strong>Prereqs:</strong> ${poll.prerequisites}</span>`:''}
+    </div>`:''}
   </div>
   <div style="background:#fffbf2;border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#7a4f00;line-height:1.5;">
-    <strong>How this works:</strong> This tool helps instructors find times that work for the most members. Voting does not guarantee a class will be scheduled. For the best chance of a class being listed, <strong>select every time that works for you</strong> — not just your top choice. Once a class is officially listed, sign up through the <a href="https://mms.thebodgery.org/events/" target="_blank" style="color:var(--orange);font-weight:700;">Bodgery Events page</a>.
+    <strong>How this works:</strong> This tool helps instructors find times that work for the most members. Voting does not guarantee a class will be scheduled. For the best chance of a class being listed, <strong>select every time that works for you</strong> — not just your top choice. If you've already voted and want to change your selections, submit again with the same name — your previous response will be replaced. Once a class is officially listed, sign up through the <a href="https://mms.thebodgery.org/events/" target="_blank" style="color:var(--orange);font-weight:700;">Bodgery Events page</a>.
   </div>
   <div class="card"><div class="card-title">Your Name</div><input type="text" id="voter-name" placeholder="First and last name"></div>
   <div class="card">
@@ -976,14 +1104,15 @@ function renderVCal(){
     html+=`<div class="${cls}"><div class="vcal-day-num">${cur.getDate()}</div>`;
     dayItems.forEach(item=>{
       const isSel=voteSelected.has(item.id);
+      const cnt=vCalShowCounts&&vCalCounts[item.id]?` · ${vCalCounts[item.id]}`:'';
       if(item.type==='recur'){
         const first=item.slots[0];
         const cls2=isSel?'vcal-pill vp-recur-selected':'vcal-pill vp-recur';
-        html+=`<span class="${cls2}" onclick="event.stopPropagation();vCalToggleItem('${item.id}');renderVCal();">↻ ${fmt(first.start_time.slice(0,5))}–${fmt(first.end_time.slice(0,5))}</span>`;
+        html+=`<span class="${cls2}" onclick="event.stopPropagation();vCalToggleItem('${item.id}');renderVCal();">↻ ${fmt(first.start_time.slice(0,5))}–${fmt(first.end_time.slice(0,5))}${cnt}</span>`;
       } else {
         const s=item.slot;
         const cls2=isSel?'vcal-pill vp-selected':'vcal-pill vp-avail';
-        html+=`<span class="${cls2}" onclick="event.stopPropagation();vCalToggleItem('${item.id}');renderVCal();">${fmt(s.start_time.slice(0,5))}–${fmt(s.end_time.slice(0,5))}</span>`;
+        html+=`<span class="${cls2}" onclick="event.stopPropagation();vCalToggleItem('${item.id}');renderVCal();">${fmt(s.start_time.slice(0,5))}–${fmt(s.end_time.slice(0,5))}${cnt}</span>`;
       }
     });
     html+='</div></td>';
@@ -1042,18 +1171,19 @@ function vCalDayClick(ds){
     </div>`;
   dayItems.forEach(item=>{
     const isSel=voteSelected.has(item.id);
+    const cnt=vCalShowCounts&&vCalCounts[item.id]?` · ${vCalCounts[item.id]} vote${vCalCounts[item.id]!==1?'s':''}`:'';
     if(item.type==='recur'){
       const first=item.slots[0],last=item.slots[item.slots.length-1];
       const ld=new Date(last.date+'T00:00:00');
       html+=`<button class="day-slot-btn${isSel?' on':''}" onclick="vCalToggleItem('${item.id}');renderVCal();vCalDayClick('${ds}')">
-        <div><div class="dst">↻ ${fmt(first.start_time.slice(0,5))} – ${fmt(first.end_time.slice(0,5))}</div>
+        <div><div class="dst">↻ ${fmt(first.start_time.slice(0,5))} – ${fmt(first.end_time.slice(0,5))}${cnt}</div>
         <div class="dsm">${item.slots.length}-week series · ends ${ld.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div>
         <div class="day-slot-check">${isSel?'✓':''}</div>
       </button>`;
     } else {
       const s=item.slot;
       html+=`<button class="day-slot-btn${isSel?' on':''}" onclick="vCalToggleItem('${item.id}');renderVCal();vCalDayClick('${ds}')">
-        <div><div class="dst">${fmt(s.start_time.slice(0,5))} – ${fmt(s.end_time.slice(0,5))}</div></div>
+        <div><div class="dst">${fmt(s.start_time.slice(0,5))} – ${fmt(s.end_time.slice(0,5))}${cnt}</div></div>
         <div class="day-slot-check">${isSel?'✓':''}</div>
       </button>`;
     }
@@ -1075,24 +1205,25 @@ async function checkAndSubmit(pollId){
   if(!name){alert('Please enter your name.');return;}
   if(!voteSelected.size){alert('Please select at least one option.');return;}
   warnZone.innerHTML='';
-  const existing=await api(`votes?poll_id=eq.${pollId}&select=voter_name`);
+  const existing=await api(`votes?poll_id=eq.${pollId}&select=id,voter_name`);
   const nameLower=name.toLowerCase();
   const dupMatch=existing.find(v=>v.voter_name.toLowerCase()===nameLower);
   if(dupMatch){
     warnZone.innerHTML=`<div class="dup-warning">
-      <p>A vote from <strong>${dupMatch.voter_name}</strong> has already been recorded for this poll. If this is a different person, submit anyway. Otherwise check your name.</p>
+      <p>A vote from <strong>${dupMatch.voter_name}</strong> already exists for this poll.</p>
       <div class="btn-row">
-        <button class="btn btn-warn" onclick="doSubmit('${pollId}',true)">Submit Anyway</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('dup-warning-zone').innerHTML=''">Go Back</button>
+        <button class="btn btn-primary" onclick="doSubmit('${pollId}','replace','${dupMatch.id}')">Update My Vote</button>
+        <button class="btn btn-warn" onclick="doSubmit('${pollId}','add','')">Submit as Additional Person</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('dup-warning-zone').innerHTML=''">Cancel</button>
       </div>
     </div>`;
     warnZone.scrollIntoView({behavior:'smooth'});
     return;
   }
-  doSubmit(pollId,false);
+  doSubmit(pollId,'new','');
 }
 
-async function doSubmit(pollId,forced){
+async function doSubmit(pollId,mode,existingVoteId){
   const name=document.getElementById('voter-name').value.trim();
   const msg=document.getElementById('vote-msg');
   const warnZone=document.getElementById('dup-warning-zone');
@@ -1106,10 +1237,13 @@ async function doSubmit(pollId,forced){
   });
   msg.textContent='Submitting...';msg.style.color='var(--muted)';
   try{
+    if(mode==='replace'&&existingVoteId){
+      await api(`votes?id=eq.${existingVoteId}`,{method:'DELETE',prefer:'return=minimal'});
+    }
     await api('votes',{method:'POST',body:{poll_id:pollId,voter_name:name,slot_ids:allSlotIds},prefer:'return=minimal'});
     warnZone.innerHTML='';
     msg.style.color='#2d6a4f';
-    msg.textContent=forced?'Submitted! Additional vote recorded.':'Submitted! Your availability has been recorded.';
+    msg.textContent=mode==='replace'?'Updated! Your previous vote has been replaced.':mode==='add'?'Submitted! Additional vote recorded.':'Submitted! Your availability has been recorded.';
     document.getElementById('submit-vote-btn').disabled=true;
   }catch(e){msg.style.color='#c0392b';msg.textContent='Error submitting. Please try again.';}
 }
@@ -1171,7 +1305,8 @@ function renderResults(poll,slts,votes,el){
   let html=`<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1rem;">
       <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
-      <div style="font-size:12px;color:var(--muted);">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+fmtDateUS(poll.deadline):''}</div>
+      <div style="font-size:12px;color:var(--muted);">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+fmtDateUS(poll.deadline):''}${poll.category?` · Category: ${poll.category}`:''}</div>
+      ${(poll.cost||poll.min_attendees||poll.max_attendees||poll.prerequisites)?`<div style="font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px;">${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}${poll.min_attendees?`<span><strong>Min:</strong> ${poll.min_attendees}</span>`:''}${poll.max_attendees?`<span><strong>Max:</strong> ${poll.max_attendees}</span>`:''}${poll.prerequisites?`<span><strong>Prereqs:</strong> ${poll.prerequisites}</span>`:''}</div>`:''}
       ${poll.description?`<div style="font-size:12px;color:var(--muted);margin-top:4px;">${poll.description}</div>`:''}</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <span class="badge ${poll.is_closed?'badge-closed':'badge-open'}">${poll.is_closed?'Closed':'Open'}</span>
@@ -1370,7 +1505,14 @@ function captureEditFormState(){
     name:n.value,
     instructor:document.getElementById('edit-instructor').value,
     desc:document.getElementById('edit-desc').value,
-    deadline:document.getElementById('edit-deadline').value
+    deadline:document.getElementById('edit-deadline').value,
+    cost:document.getElementById('edit-cost').value,
+    min_attendees:document.getElementById('edit-min').value,
+    max_attendees:document.getElementById('edit-max').value,
+    prerequisites:document.getElementById('edit-prereqs').value,
+    is_public:document.getElementById('edit-public').checked,
+    category:document.getElementById('edit-category').value,
+    hide_results:document.getElementById('edit-hide-results').checked
   };
 }
 
@@ -1390,7 +1532,7 @@ function renderEditPanel(){
   const p=currentResultsPoll;if(!p)return;
   const panel=document.getElementById('edit-poll-panel');
   if(!panel)return;
-  const fs=editFormState||{name:p.event_name||'',instructor:p.instructor_name||'',desc:p.description||'',deadline:p.deadline||''};
+  const fs=editFormState||{name:p.event_name||'',instructor:p.instructor_name||'',desc:p.description||'',deadline:p.deadline||'',cost:p.cost||'',min_attendees:p.min_attendees||'',max_attendees:p.max_attendees||'',prerequisites:p.prerequisites||'',is_public:!!p.is_public,category:p.category||'',hide_results:!!p.hide_results};
   const singles=currentResultsSlots.filter(s=>!s.recurrence_group);
   const recurGroups={};
   currentResultsSlots.filter(s=>s.recurrence_group).forEach(s=>{(recurGroups[s.recurrence_group]=recurGroups[s.recurrence_group]||[]).push(s);});
@@ -1423,10 +1565,31 @@ function renderEditPanel(){
       <input type="text" id="edit-name" value="${fs.name.replace(/"/g,'&quot;')}">
       <label>Instructor Name</label>
       <input type="text" id="edit-instructor" value="${fs.instructor.replace(/"/g,'&quot;')}">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:120px;"><label>Cost</label><input type="text" id="edit-cost" value="${(fs.cost||'').replace(/"/g,'&quot;')}"></div>
+        <div style="flex:1;min-width:120px;"><label>Min Attendees</label><input type="text" id="edit-min" value="${(fs.min_attendees||'').replace(/"/g,'&quot;')}"></div>
+        <div style="flex:1;min-width:120px;"><label>Max Attendees</label><input type="text" id="edit-max" value="${(fs.max_attendees||'').replace(/"/g,'&quot;')}"></div>
+      </div>
+      <label>Prerequisites</label>
+      <input type="text" id="edit-prereqs" value="${(fs.prerequisites||'').replace(/"/g,'&quot;')}">
       <label>Description</label>
       <textarea id="edit-desc">${fs.desc}</textarea>
       <label>Voting Deadline</label>
       <input type="date" id="edit-deadline" value="${fs.deadline}">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;">
+        <label style="display:flex;align-items:center;gap:8px;margin:0;font-size:13px;cursor:pointer;">
+          <input type="checkbox" id="edit-public" style="width:auto;accent-color:var(--orange);" ${fs.is_public?'checked':''} onchange="document.getElementById('edit-category-wrap').style.display=this.checked?'block':'none'">
+          Public poll
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin:0;font-size:13px;cursor:pointer;">
+          <input type="checkbox" id="edit-hide-results" style="width:auto;accent-color:var(--orange);" ${fs.hide_results?'checked':''}>
+          Hide results from voters
+        </label>
+      </div>
+      <div id="edit-category-wrap" style="${fs.is_public?'':'display:none;'}margin-top:8px;">
+        <label>Category</label>
+        <input type="text" id="edit-category" value="${(fs.category||'').replace(/"/g,'&quot;')}">
+      </div>
       <div style="margin-top:14px;">
         <div class="card-title" style="margin-bottom:8px;">Time Slots</div>
         ${slotsHtml||'<p class="hint">No slots yet.</p>'}
@@ -1489,11 +1652,19 @@ function unstageAddSlot(i){
 
 async function saveEditPoll(){
   const p=currentResultsPoll;if(!p)return;
+  const isPublic=document.getElementById('edit-public').checked;
   const body={
     event_name:document.getElementById('edit-name').value.trim(),
     instructor_name:document.getElementById('edit-instructor').value.trim(),
     description:document.getElementById('edit-desc').value.trim(),
-    deadline:document.getElementById('edit-deadline').value||null
+    deadline:document.getElementById('edit-deadline').value||null,
+    cost:document.getElementById('edit-cost').value.trim()||null,
+    min_attendees:document.getElementById('edit-min').value.trim()||null,
+    max_attendees:document.getElementById('edit-max').value.trim()||null,
+    prerequisites:document.getElementById('edit-prereqs').value.trim()||null,
+    is_public:isPublic,
+    category:isPublic?(document.getElementById('edit-category').value.trim()||null):null,
+    hide_results:document.getElementById('edit-hide-results').checked
   };
   if(!body.event_name||!body.instructor_name){alert('Event name and instructor are required.');return;}
   try{
@@ -1524,6 +1695,10 @@ function duplicatePoll(){
     instructor_name:p.instructor_name,
     description:p.description||'',
     deadline:p.deadline||'',
+    cost:p.cost||'',
+    min_attendees:p.min_attendees||'',
+    max_attendees:p.max_attendees||'',
+    prerequisites:p.prerequisites||'',
     ical_urls:p.ical_urls||[],
     slots:currentResultsSlots.map(s=>({date:s.date,start_time:s.start_time,end_time:s.end_time,recurrence_group:s.recurrence_group,recurrence_weeks:s.recurrence_weeks}))
   };
@@ -1606,6 +1781,10 @@ function applyDuplicateIfPresent(){
   let data;try{data=JSON.parse(raw);}catch(e){return;}
   document.getElementById('ev-name').value=data.event_name||'';
   document.getElementById('ev-instructor').value=data.instructor_name||'';
+  document.getElementById('ev-cost').value=data.cost||'';
+  document.getElementById('ev-min').value=data.min_attendees||'';
+  document.getElementById('ev-max').value=data.max_attendees||'';
+  document.getElementById('ev-prereqs').value=data.prerequisites||'';
   document.getElementById('ev-desc').value=data.description||'';
   document.getElementById('ev-deadline').value=data.deadline||'';
   if(data.ical_urls&&data.ical_urls.length){
