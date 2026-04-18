@@ -999,8 +999,27 @@ async function loadVote(){
     const polls=await api(`polls?id=eq.${id}&select=*`);
     if(!polls.length){el.innerHTML='<div class="empty">Poll not found. Check the ID and try again.</div>';return;}
     const poll=polls[0];
-    if(poll.is_closed){el.innerHTML='<div class="empty">This poll is closed.</div>';return;}
-    if(poll.deadline&&poll.deadline<new Date().toISOString().split('T')[0]){el.innerHTML='<div class="empty">This poll\'s voting deadline ('+fmtDateUS(poll.deadline)+') has passed.</div>';return;}
+    const isPastDeadline=poll.deadline&&poll.deadline<new Date().toISOString().split('T')[0];
+    if(poll.is_closed||isPastDeadline){
+      let html=`<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+          <div><div class="section-title" style="font-size:20px;">${poll.event_name}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Instructor: ${poll.instructor_name}${poll.deadline?' · Deadline: '+fmtDateUS(poll.deadline):''}</div></div>
+          <span class="badge badge-closed">Closed</span>
+        </div>
+        ${poll.description?`<p style="margin-top:10px;font-size:14px;">${poll.description}</p>`:''}
+        ${(poll.cost||poll.min_attendees||poll.prerequisites)?`<div style="margin-top:10px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 16px;">
+          ${poll.cost?`<span><strong>Cost:</strong> ${poll.cost}</span>`:''}
+          ${poll.min_attendees?`<span><strong>Attendees:</strong> ${poll.min_attendees}</span>`:''}
+          ${poll.prerequisites?`<span><strong>Prereqs:</strong> ${poll.prerequisites}</span>`:''}
+        </div>`:''}
+      </div>
+      <div style="background:#fde8e4;border:1px solid var(--orange);border-radius:8px;padding:10px 14px;font-size:13px;color:#7a2e1a;line-height:1.5;">
+        <strong>${isPastDeadline?'Voting deadline passed.':'This poll has been closed.'}</strong>
+        ${isPastDeadline?` The deadline for this poll was <strong>${fmtDateUS(poll.deadline)}</strong>.`:''} Voting is no longer available. If you believe this is an error, contact the instructor.
+      </div>`;
+      el.innerHTML=html;return;
+    }
     const slts=await api(`time_slots?poll_id=eq.${id}&order=date.asc,start_time.asc&select=*`);
     let votes=[];
     if(!poll.hide_results){votes=await api(`votes?poll_id=eq.${id}&select=slot_ids`);}
