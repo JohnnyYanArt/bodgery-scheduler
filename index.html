@@ -973,13 +973,28 @@ function renderPublicPolls(){
     if(p.cost)details.push(`Cost: ${p.cost}`);
     if(p.min_attendees)details.push(`Attendees: ${p.min_attendees}`);
     if(p.deadline)details.push(`Deadline: ${fmtDateUS(p.deadline)}`);
+    const desc=p.description||'';
+    const prereq=p.prerequisites?'Prerequisites: '+p.prerequisites:'';
+    let detailsHtml='';
+    if(desc||prereq){
+      let fullHtml='';
+      if(desc)fullHtml+='<div style="font-size:12px;color:var(--text);margin-top:4px;">'+desc+'</div>';
+      if(prereq)fullHtml+='<div style="font-size:11px;color:#7a4f00;margin-top:2px;">'+prereq+'</div>';
+      const combined=(desc+' '+prereq).trim();
+      if(combined.length<=120){
+        detailsHtml=fullHtml;
+      }else{
+        const truncText=combined.substring(0,120)+'\u2026';
+        const uid='bp_'+p.id.replace(/-/g,'').substring(0,8);
+        detailsHtml='<div id="'+uid+'_short" style="margin-top:4px;font-size:12px;color:var(--text);">'+truncText+' <a href="#" onclick="event.preventDefault();document.getElementById(\''+uid+'_short\').style.display=\'none\';document.getElementById(\''+uid+'_full\').style.display=\'block\';" style="color:var(--gold);font-size:11px;font-weight:700;">Show more</a></div><div id="'+uid+'_full" style="display:none;">'+fullHtml+'<div style="margin-top:2px;"><a href="#" onclick="event.preventDefault();document.getElementById(\''+uid+'_full\').style.display=\'none\';document.getElementById(\''+uid+'_short\').style.display=\'block\';" style="color:var(--gold);font-size:11px;font-weight:700;">Show less</a></div></div>';
+      }
+    }
     html+=`<div style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
         <div style="flex:1;">
           <div style="font-weight:700;font-size:14px;">${p.event_name}${p.category?` <span style="font-size:10px;background:var(--gold);color:var(--dark);padding:1px 6px;border-radius:10px;font-weight:700;vertical-align:middle;">${p.category}</span>`:''}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px;">by ${p.instructor_name}${details.length?' · '+details.join(' · '):''}</div>
-          ${p.description?`<div style="font-size:12px;color:var(--text);margin-top:4px;">${p.description}</div>`:''}
-          ${p.prerequisites?`<div style="font-size:11px;color:#7a4f00;margin-top:2px;">Prerequisites: ${p.prerequisites}</div>`:''}
+          ${detailsHtml}
         </div>
         <button class="btn btn-primary btn-sm" onclick="document.getElementById('vote-id').value='${p.id}';showPage('vote',document.getElementById('tab-vote'));loadVote();">Vote</button>
       </div>
