@@ -438,6 +438,7 @@
       <select id="public-category-filter" style="flex:1;min-width:140px;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;" onchange="renderPublicPolls()">
         <option value="">All categories</option>
       </select>
+      <button class="copy-btn" onclick="copyCategoryLink(this)" title="Copy a shareable link for this category filter">Copy Link</button>
     </div>
     <div id="public-polls-list"><div class="empty">Loading...</div></div>
   </div>
@@ -551,6 +552,16 @@ function copyText(text,btn){
   navigator.clipboard.writeText(text).then(()=>{
     btn.textContent='Copied!';btn.classList.add('copied');
     setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},2000);
+  });
+}
+
+function copyCategoryLink(btn){
+  const cat=document.getElementById('public-category-filter').value;
+  const base=window.location.origin+window.location.pathname;
+  const url=cat?`${base}?category=${encodeURIComponent(cat)}`:base;
+  navigator.clipboard.writeText(url).then(()=>{
+    btn.textContent='Copied!';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='Copy Link';btn.classList.remove('copied');},2000);
   });
 }
 
@@ -933,7 +944,8 @@ let publicPollsData=[];
 async function loadPublicPolls(){
   try{
     const polls=await api(`polls?is_public=eq.true&is_closed=eq.false&order=created_at.desc&select=id,event_name,instructor_name,category,deadline,description,cost,min_attendees,max_attendees,prerequisites,created_at`);
-    publicPollsData=polls||[];
+    const today=new Date().toISOString().split('T')[0];
+    publicPollsData=(polls||[]).filter(p=>!p.deadline||p.deadline>=today);
     // Populate category filter
     const filter=document.getElementById('public-category-filter');
     const cats=[...new Set(publicPollsData.map(p=>p.category).filter(Boolean))].sort();
@@ -988,6 +1000,7 @@ async function loadVote(){
     if(!polls.length){el.innerHTML='<div class="empty">Poll not found. Check the ID and try again.</div>';return;}
     const poll=polls[0];
     if(poll.is_closed){el.innerHTML='<div class="empty">This poll is closed.</div>';return;}
+    if(poll.deadline&&poll.deadline<new Date().toISOString().split('T')[0]){el.innerHTML='<div class="empty">This poll\'s voting deadline ('+fmtDateUS(poll.deadline)+') has passed.</div>';return;}
     const slts=await api(`time_slots?poll_id=eq.${id}&order=date.asc,start_time.asc&select=*`);
     let votes=[];
     if(!poll.hide_results){votes=await api(`votes?poll_id=eq.${id}&select=slot_ids`);}
