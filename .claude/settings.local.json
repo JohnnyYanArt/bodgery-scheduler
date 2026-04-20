@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python _check.py)",
+      "Bash(rm _check.py)"
+    ]
+  }
+}
